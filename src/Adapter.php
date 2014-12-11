@@ -34,10 +34,10 @@ class Adapter extends AbstractAdapter
     protected $client;
 
     /**
-     * Constructor
+     * Constructor.
      *
      * @param Client $client
-     * @param string   $prefix
+     * @param string $prefix
      */
     public function __construct(Client $client, $prefix = null)
     {
@@ -240,10 +240,11 @@ class Adapter extends AbstractAdapter
     }
 
     /**
-     * Normalise a WebDAV repsonse object
+     * Normalise a WebDAV repsonse object.
      *
      * @param array  $object
      * @param string $path
+     *
      * @return array
      */
     protected function normalizeObject(array $object, $path)
