@@ -1,10 +1,10 @@
 <?php
 
-use League\Flysystem\WebDAV\WebDAVAdapter;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
+use League\Flysystem\WebDAV\WebDAVAdapter;
 
-class WebDavTests extends PHPUnit_Framework_TestCase
+class WebDAVTests extends PHPUnit_Framework_TestCase
 {
     protected function getClient()
     {
