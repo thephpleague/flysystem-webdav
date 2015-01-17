@@ -12,7 +12,7 @@ use LogicException;
 use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
 
-class Adapter extends AbstractAdapter
+class WebDAVAdapter extends AbstractAdapter
 {
     use StreamedTrait;
     use StreamedCopyTrait;

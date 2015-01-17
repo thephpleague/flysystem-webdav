@@ -18,9 +18,9 @@ This is a Flysystem adapter for the WebDAV.
 <?php
 use Sabre\DAV\Client;
 use League\Flysystem\Filesystem;
-use League\Flysystem\WebDAV\Adapter;
+use League\Flysystem\WebDAV\WebDAVAdapter;
 
 $client = new Client($settings);
-$adapter = new Adapter($client);
+$adapter = new WebDAVAdapter($client);
 $flysystem = new Filesystem($adapter);
 ```

@@ -1,6 +1,6 @@
 <?php
 
-use League\Flysystem\WebDAV\Adapter;
+use League\Flysystem\WebDAV\WebDAVAdapter;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 
@@ -17,7 +17,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
         $mock->shouldReceive('propFind')->once()->andReturn([
             '{DAV:}getcontentlength' => 20,
         ]);
-        $adapter = new Filesystem(new Adapter($mock));
+        $adapter = new Filesystem(new WebDAVAdapter($mock));
         $this->assertTrue($adapter->has('something'));
     }
 
@@ -25,7 +25,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('propFind')->once()->andThrow('Sabre\DAV\Exception\FileNotFound');
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $this->assertFalse($adapter->has('something'));
     }
 
@@ -33,7 +33,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->once();
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $this->assertInternalType('array', $adapter->write('something', 'something', new Config()));
     }
 
@@ -41,7 +41,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->once();
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $this->assertInternalType('array', $adapter->update('something', 'something', new Config()));
     }
 
@@ -52,7 +52,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->once();
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $this->assertInternalType('array', $adapter->write('something', 'something', new Config([
             'visibility' => 'private',
         ])));
@@ -68,7 +68,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
                 'last-modified' => date('Y-m-d H:i:s'),
             ],
         ]);
-        $adapter = new Adapter($mock, 'bucketname', 'prefix');
+        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->readStream('file.txt');
         $this->assertInternalType('resource', $result['stream']);
     }
@@ -79,7 +79,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
         $mock->shouldReceive('request')->once()->andReturn([
             'statusCode' => 200,
         ]);
-        $adapter = new Adapter($mock, 'bucketname');
+        $adapter = new WebDAVAdapter($mock, 'bucketname');
         $result = $adapter->rename('old', 'new');
         $this->assertTrue($result);
     }
@@ -90,7 +90,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
         $mock->shouldReceive('request')->once()->andReturn([
             'statusCode' => 404,
         ]);
-        $adapter = new Adapter($mock, 'bucketname');
+        $adapter = new WebDAVAdapter($mock, 'bucketname');
         $result = $adapter->rename('old', 'new');
         $this->assertFalse($result);
     }
@@ -99,7 +99,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->once()->andThrow('Sabre\DAV\Exception\FileNotFound');
-        $adapter = new Adapter($mock, 'bucketname');
+        $adapter = new WebDAVAdapter($mock, 'bucketname');
         $result = $adapter->rename('old', 'new');
         $this->assertFalse($result);
     }
@@ -108,7 +108,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andReturn(true);
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertTrue($result);
     }
@@ -117,7 +117,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\FileNotFound');
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertFalse($result);
     }
@@ -142,7 +142,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
             ],
         ];
         $mock->shouldReceive('propFind')->twice()->andReturn($first, $second);
-        $adapter = new Adapter($mock, 'bucketname');
+        $adapter = new WebDAVAdapter($mock, 'bucketname');
         $listing = $adapter->listContents('', true);
         $this->assertInternalType('array', $listing);
     }
@@ -169,7 +169,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
             '{DAV:}getcontenttype' => 'plain/text',
             '{DAV:}getlastmodified' => date('Y-m-d H:i:s'),
         ]);
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $result = $adapter->{$method}('object.ext');
         $this->assertInternalType('array', $result);
     }
@@ -180,7 +180,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
         $mock->shouldReceive('request')->with('MKCOL', 'dirname')->once()->andReturn([
             'statusCode' => 201,
         ]);
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
         $this->assertInternalType('array', $result);
     }
@@ -191,7 +191,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
         $mock->shouldReceive('request')->with('MKCOL', 'dirname')->once()->andReturn([
             'statusCode' => 500,
         ]);
-        $adapter = new Adapter($mock);
+        $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
         $this->assertFalse($result);
     }
@@ -206,7 +206,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
                 'last-modified' => date('Y-m-d H:i:s'),
             ],
         ]);
-        $adapter = new Adapter($mock, 'bucketname', 'prefix');
+        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
         $this->assertInternalType('array', $result);
     }
@@ -221,7 +221,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
                 'last-modified' => date('Y-m-d H:i:s'),
             ],
         ]);
-        $adapter = new Adapter($mock, 'bucketname', 'prefix');
+        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
         $this->assertFalse($result);
     }
@@ -236,7 +236,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
                 'last-modified' => date('Y-m-d H:i:s'),
             ],
         ]);
-        $adapter = new Adapter($mock, 'bucketname', 'prefix');
+        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->readStream('file.txt');
         $this->assertFalse($result);
     }
@@ -245,7 +245,7 @@ class WebDavTests extends PHPUnit_Framework_TestCase
     {
         $mock = $this->getClient();
         $mock->shouldReceive('request')->andThrow('Sabre\DAV\Exception\FileNotFound');
-        $adapter = new Adapter($mock, 'bucketname', 'prefix');
+        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
         $this->assertFalse($result);
     }
