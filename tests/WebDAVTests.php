@@ -24,7 +24,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
     public function testHasFail()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('propFind')->once()->andThrow('Sabre\DAV\Exception\FileNotFound');
+        $mock->shouldReceive('propFind')->once()->andThrow('Sabre\DAV\Exception\NotFound');
         $adapter = new WebDAVAdapter($mock);
         $this->assertFalse($adapter->has('something'));
     }
@@ -98,7 +98,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
     public function testRenameFailException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once()->andThrow('Sabre\DAV\Exception\FileNotFound');
+        $mock->shouldReceive('request')->once()->andThrow('Sabre\DAV\Exception\NotFound');
         $adapter = new WebDAVAdapter($mock, 'bucketname');
         $result = $adapter->rename('old', 'new');
         $this->assertFalse($result);
@@ -116,7 +116,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
     public function testDeleteDirFail()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\FileNotFound');
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\NotFound');
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertFalse($result);
@@ -244,7 +244,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
     public function testReadException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->andThrow('Sabre\DAV\Exception\FileNotFound');
+        $mock->shouldReceive('request')->andThrow('Sabre\DAV\Exception\NotFound');
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
         $this->assertFalse($result);
