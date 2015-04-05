@@ -87,12 +87,12 @@ class WebDAVAdapter extends AbstractAdapter
             if ($response['statusCode'] !== 200) {
                 return false;
             }
-
+            $headers = array_map(function ($el) { return join(',', $el); }, $response['headers']);
             return array_merge([
                 'contents' => $response['body'],
-                'timestamp' => strtotime($response['headers']['last-modified']),
+                'timestamp' => strtotime($headers['last-modified']),
                 'path' => $path,
-            ], Util::map($response['headers'], static::$resultMap));
+            ], Util::map($headers, static::$resultMap));
         } catch (Exception\FileNotFound $e) {
             return false;
         }

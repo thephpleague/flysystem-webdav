@@ -65,7 +65,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
             'statusCode' => 200,
             'body' => 'contents',
             'headers' => [
-                'last-modified' => date('Y-m-d H:i:s'),
+                'last-modified' => [ date('Y-m-d H:i:s') ],
             ],
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
@@ -203,7 +203,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
             'statusCode' => 200,
             'body' => 'contents',
             'headers' => [
-                'last-modified' => date('Y-m-d H:i:s'),
+                'last-modified' => [ date('Y-m-d H:i:s') ],
             ],
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
@@ -218,7 +218,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
             'statusCode' => 404,
             'body' => 'contents',
             'headers' => [
-                'last-modified' => date('Y-m-d H:i:s'),
+                'last-modified' => [ date('Y-m-d H:i:s') ],
             ],
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
@@ -233,7 +233,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
             'statusCode' => 404,
             'body' => 'contents',
             'headers' => [
-                'last-modified' => date('Y-m-d H:i:s'),
+                'last-modified' => [ date('Y-m-d H:i:s') ],
             ],
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
