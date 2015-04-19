@@ -11,6 +11,7 @@ use League\Flysystem\Util;
 use LogicException;
 use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
+use Sabre\DAV\Exception\NotFound;
 
 class WebDAVAdapter extends AbstractAdapter
 {
@@ -93,7 +94,7 @@ class WebDAVAdapter extends AbstractAdapter
                 'timestamp' => strtotime($response['headers']['last-modified']),
                 'path' => $path,
             ], Util::map($response['headers'], static::$resultMap));
-        } catch (Exception\FileNotFound $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -138,7 +139,7 @@ class WebDAVAdapter extends AbstractAdapter
             if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
                 return true;
             }
-        } catch (Exception\FileNotFound $e) {
+        } catch (NotFound $e) {
             // Would have returned false here, but would be redundant
         }
 
@@ -156,7 +157,7 @@ class WebDAVAdapter extends AbstractAdapter
             $this->client->request('DELETE', $location);
 
             return true;
-        } catch (Exception\FileNotFound $e) {
+        } catch (NotFound $e) {
             return false;
         }
     }
