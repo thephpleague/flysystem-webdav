@@ -62,7 +62,7 @@ class WebDAVAdapter extends AbstractAdapter
             ]);
 
             return $this->normalizeObject($result, $path);
-        } catch (Exception\FileNotFound $e) {
+        } catch (Exception $e) {
             return false;
         }
     }
