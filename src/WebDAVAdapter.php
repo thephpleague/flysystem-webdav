@@ -201,7 +201,6 @@ class WebDAVAdapter extends AbstractAdapter
         ], 1);
 
         array_shift($response);
-
         $result = [];
 
         foreach ($response as $path => $object) {
