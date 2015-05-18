@@ -91,7 +91,9 @@ class WebDAVAdapter extends AbstractAdapter
 
             return array_merge([
                 'contents' => $response['body'],
-                'timestamp' => strtotime(is_array($response['headers']['last-modified']) ? current($response['headers']['last-modified']) : $response['headers']['last-modified']),
+                'timestamp' => strtotime(is_array($response['headers']['last-modified'])
+                    ? current($response['headers']['last-modified'])
+                    : $response['headers']['last-modified']),
                 'path' => $path,
             ], Util::map($response['headers'], static::$resultMap));
         } catch (Exception $e) {
@@ -106,7 +108,6 @@ class WebDAVAdapter extends AbstractAdapter
     {
         $location = $this->applyPathPrefix($path);
         $this->client->request('PUT', $location, $contents);
-
         $result = compact('path', 'contents');
 
         if ($config->get('visibility')) {
@@ -130,10 +131,11 @@ class WebDAVAdapter extends AbstractAdapter
     public function rename($path, $newpath)
     {
         $location = $this->applyPathPrefix($path);
+        $newLocation = $this->applyPathPrefix($newpath);
 
         try {
             $response = $this->client->request('MOVE', '/'.ltrim($location, '/'), null, [
-                'Destination' => '/'.ltrim($newpath, '/'),
+                'Destination' => '/'.ltrim($newLocation, '/'),
             ]);
 
             if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
@@ -191,7 +193,6 @@ class WebDAVAdapter extends AbstractAdapter
     public function listContents($directory = '', $recursive = false)
     {
         $location = $this->applyPathPrefix($directory);
-
         $response = $this->client->propFind($location, [
             '{DAV:}displayname',
             '{DAV:}getcontentlength',
