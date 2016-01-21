@@ -32,9 +32,22 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
     public function testWrite()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once();
+        $mock->shouldReceive('request')->once()->andReturn([
+            'statusCode' => 200,
+        ]);
         $adapter = new WebDAVAdapter($mock);
         $this->assertInternalType('array', $adapter->write('something', 'something', new Config()));
+    }
+
+    public function testWriteFail()
+    {
+        $mock = $this->getClient();
+        $mock->shouldReceive('request')->with('PUT', 'something', 'something')->once()->andReturn([
+            'statusCode' => 500,
+        ]);
+        $adapter = new WebDAVAdapter($mock);
+        $result = $adapter->write('something', 'something', new Config());
+        $this->assertFalse($result);
     }
 
     public function testUpdate()
@@ -51,7 +64,9 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
     public function testWriteVisibility()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once();
+        $mock->shouldReceive('request')->once()->andReturn([
+            'statusCode' => 200,
+        ]);
         $adapter = new WebDAVAdapter($mock);
         $this->assertInternalType('array', $adapter->write('something', 'something', new Config([
             'visibility' => 'private',
