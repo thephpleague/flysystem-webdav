@@ -198,7 +198,7 @@ class WebDAVAdapter extends AbstractAdapter
     public function listContents($directory = '', $recursive = false)
     {
         $location = $this->applyPathPrefix($directory);
-        $response = $this->client->propFind($location, [
+        $response = $this->client->propFind($location . '/', [
             '{DAV:}displayname',
             '{DAV:}getcontentlength',
             '{DAV:}getcontenttype',
