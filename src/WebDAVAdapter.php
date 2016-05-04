@@ -270,4 +270,15 @@ class WebDAVAdapter extends AbstractAdapter
 
         return $result;
     }
+
+    /**
+     * @param string $path
+     * @return string
+     */
+    public function applyPathPrefix($path)
+    {
+        $pathWithPrefix = parent::applyPathPrefix($path);
+
+        return str_replace(' ', '%20', $pathWithPrefix);
+    }
 }
