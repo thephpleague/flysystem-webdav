@@ -13,7 +13,7 @@ use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
 use Sabre\DAV\Exception\NotFound;
 
-class WebDAVAdapterx extends AbstractAdapter
+class WebDAVAdapter extends AbstractAdapter
 {
     use StreamedTrait;
     use StreamedCopyTrait;
@@ -233,7 +233,7 @@ class WebDAVAdapterx extends AbstractAdapter
                 $result = array_merge($result, $this->listContents($object['path'], true));
             }
         }
-		
+
         return $result;
     }
 
