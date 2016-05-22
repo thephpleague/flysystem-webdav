@@ -47,11 +47,27 @@ class WebDAVAdapter extends AbstractAdapter
     }
 
     /**
+     * url encode a path
+     *
+     * @param string $path
+     *
+     * @return string
+     */
+    protected function encodePath($path)
+	{
+		$a = explode('/', $path);
+		for ($i=0; $i<count($a); $i++) {
+			$a[$i] = rawurlencode($a[$i]);
+		}
+		return implode('/', $a);
+	}
+	
+    /**
      * {@inheritdoc}
      */
     public function getMetadata($path)
     {
-        $location = $this->applyPathPrefix($path);
+        $location = $this->applyPathPrefix($this->encodePath($path));
 
         try {
             $result = $this->client->propFind($location, [
@@ -80,7 +96,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function read($path)
     {
-        $location = $this->applyPathPrefix($path);
+        $location = $this->applyPathPrefix($this->encodePath($path));
 
         try {
             $response = $this->client->request('GET', $location);
@@ -106,7 +122,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        $location = $this->applyPathPrefix($path);
+        $location = $this->applyPathPrefix($this->encodePath($path));
         $response = $this->client->request('PUT', $location, $contents);
 
         if ($response['statusCode'] >= 400) {
@@ -135,8 +151,8 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function rename($path, $newpath)
     {
-        $location = $this->applyPathPrefix($path);
-        $newLocation = $this->applyPathPrefix($newpath);
+        $location = $this->applyPathPrefix($this->encodePath($path));
+        $newLocation = $this->applyPathPrefix($this->encodePath($newpath));
 
         try {
             $response = $this->client->request('MOVE', '/'.ltrim($location, '/'), null, [
@@ -158,7 +174,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function delete($path)
     {
-        $location = $this->applyPathPrefix($path);
+        $location = $this->applyPathPrefix($this->encodePath($path));
 
         try {
             $this->client->request('DELETE', $location);
@@ -174,7 +190,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function createDir($path, Config $config)
     {
-        $location = $this->applyPathPrefix($path);
+        $location = $this->applyPathPrefix($this->encodePath($path));
         $response = $this->client->request('MKCOL', $location);
 
         if ($response['statusCode'] !== 201) {
@@ -197,7 +213,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function listContents($directory = '', $recursive = false)
     {
-        $location = $this->applyPathPrefix($directory);
+        $location = $this->applyPathPrefix($this->encodePath($directory));
         $response = $this->client->propFind($location . '/', [
             '{DAV:}displayname',
             '{DAV:}getcontentlength',
@@ -209,7 +225,7 @@ class WebDAVAdapter extends AbstractAdapter
         $result = [];
 
         foreach ($response as $path => $object) {
-            $path = $this->removePathPrefix($path);
+            $path = urldecode($this->removePathPrefix($path));
             $object = $this->normalizeObject($object, $path);
             $result[] = $object;
 
