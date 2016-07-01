@@ -271,7 +271,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     protected function normalizeObject(array $object, $path)
     {
-        if (! isset($object['{DAV:}getcontentlength'])) {
+        if (! isset($object['{DAV:}getcontentlength']) or $object['{DAV:}getcontentlength'] == "") {
             return ['type' => 'dir', 'path' => trim($path, '/')];
         }
 
