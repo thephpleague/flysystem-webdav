@@ -1,6 +1,12 @@
 # Changelog
 
-## 1.0.1 - 2016-03-17
+## 1.0.3 - 2016-07-11
+
+### Improved
+
+* The `sabre/dav` version is upped to ~3.1.
+
+## 1.0.2 - 2016-03-17
 
 ### Improved
 
