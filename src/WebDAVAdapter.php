@@ -12,6 +12,8 @@ use LogicException;
 use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
 use Sabre\DAV\Exception\NotFound;
+use Sabre\HTTP\ClientHttpException;
+use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter extends AbstractAdapter
 {
@@ -61,7 +63,7 @@ class WebDAVAdapter extends AbstractAdapter
 		}
 		return implode('/', $a);
 	}
-	
+
     /**
      * {@inheritdoc}
      */
@@ -79,6 +81,8 @@ class WebDAVAdapter extends AbstractAdapter
 
             return $this->normalizeObject($result, $path);
         } catch (Exception $e) {
+            return false;
+        } catch (HttpException $e) {
             return false;
         }
     }

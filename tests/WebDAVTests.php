@@ -21,12 +21,23 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
         $this->assertTrue($adapter->has('something'));
     }
 
-    public function testHasFail()
+    /**
+     * @dataProvider provideExceptionsForHasFail
+     */
+    public function testHasFail($exceptionClass)
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('propFind')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('propFind')->once()->andThrow($exceptionClass);
         $adapter = new WebDAVAdapter($mock);
         $this->assertFalse($adapter->has('something'));
+    }
+
+    public function provideExceptionsForHasFail()
+    {
+        return [
+            [Mockery::mock('Sabre\DAV\Exception\NotFound')],
+            [Mockery::mock('Sabre\HTTP\ClientHttpException')],
+        ];
     }
 
     public function testWrite()
@@ -145,9 +156,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
             'filename' => [
                 '{DAV:}getcontentlength' => 20,
             ],
-            'dirname' => [
-                // '{DAV:}getcontentlength' => 20,
-            ],
+            'dirname' => [],
         ];
 
         $second = [
