@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4 - 2016-08-11
+
+### Fixed
+
+* The getMetadata function now also catches http exceptions.
+
 ## 1.0.3 - 2016-07-11
 
 ### Improved
