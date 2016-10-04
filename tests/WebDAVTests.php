@@ -273,4 +273,20 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
         $result = $adapter->read('file.txt');
         $this->assertFalse($result);
     }
+
+    public function testNativeCopy()
+    {
+        /** @var Sabre\DAV\Client|Mockery\Mock $clientMock */
+        $clientMock = $this->getClient();
+
+        $clientMock->shouldReceive('getAbsoluteUrl')->andReturn('http://webdav.local/prefix/newFile.txt');
+
+        $clientMock->shouldReceive('request')->andReturn([
+            'statusCode' => 201
+        ]);
+
+        $adapter = new WebDAVAdapter($clientMock, 'prefix', false);
+        $result = $adapter->copy('file.txt', 'newFile.txt');
+        $this->assertTrue($result);
+    }
 }

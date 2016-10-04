@@ -18,7 +18,9 @@ use Sabre\HTTP\HttpException;
 class WebDAVAdapter extends AbstractAdapter
 {
     use StreamedTrait;
-    use StreamedCopyTrait;
+    use StreamedCopyTrait {
+        StreamedCopyTrait::copy as streamedCopy;
+    }
     use NotSupportingVisibilityTrait;
 
     /**
@@ -37,15 +39,22 @@ class WebDAVAdapter extends AbstractAdapter
     protected $client;
 
     /**
+     * @var bool
+     */
+    protected $useStreamedCopy = true;
+
+    /**
      * Constructor.
      *
      * @param Client $client
      * @param string $prefix
+     * @param bool $useStreamedCopy
      */
-    public function __construct(Client $client, $prefix = null)
+    public function __construct(Client $client, $prefix = null, $useStreamedCopy = true)
     {
         $this->client = $client;
         $this->setPathPrefix($prefix);
+        $this->useStreamedCopy = $useStreamedCopy === true;
     }
 
     /**
@@ -176,6 +185,18 @@ class WebDAVAdapter extends AbstractAdapter
     /**
      * {@inheritdoc}
      */
+    public function copy($path, $newpath)
+    {
+        if ($this->useStreamedCopy === true) {
+            return $this->streamedCopy($path, $newpath);
+        } else {
+            return $this->nativeCopy($path, $newpath);
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function delete($path)
     {
         $location = $this->applyPathPrefix($this->encodePath($path));
@@ -263,6 +284,35 @@ class WebDAVAdapter extends AbstractAdapter
     public function getMimetype($path)
     {
         return $this->getMetadata($path);
+    }
+
+    /**
+     * Copy a file through WebDav COPY method.
+     *
+     * @param string $path
+     * @param string $newPath
+     *
+     * @return bool
+     */
+    protected function nativeCopy($path, $newPath)
+    {
+        $location = $this->applyPathPrefix($this->encodePath($path));
+        $newLocation = $this->applyPathPrefix($this->encodePath($newPath));
+
+        try {
+            $destination = $this->client->getAbsoluteUrl($newLocation);
+            $response = $this->client->request('COPY', '/'.ltrim($location, '/'), null, [
+                'Destination' => $destination,
+            ]);
+
+            if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
+                return true;
+            }
+        } catch (NotFound $e) {
+            // Would have returned false here, but would be redundant
+        }
+
+        return false;
     }
 
     /**
