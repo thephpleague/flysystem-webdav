@@ -54,7 +54,7 @@ class WebDAVAdapter extends AbstractAdapter
     {
         $this->client = $client;
         $this->setPathPrefix($prefix);
-        $this->useStreamedCopy = $useStreamedCopy === true;
+        $this->setUseStreamedCopy($useStreamedCopy);
     }
 
     /**
@@ -305,6 +305,22 @@ class WebDAVAdapter extends AbstractAdapter
     public function getMimetype($path)
     {
         return $this->getMetadata($path);
+    }
+
+    /**
+     * @return boolean
+     */
+    public function getUseStreamedCopy()
+    {
+        return $this->useStreamedCopy;
+    }
+
+    /**
+     * @param boolean $useStreamedCopy
+     */
+    public function setUseStreamedCopy($useStreamedCopy)
+    {
+        $this->useStreamedCopy = (bool)$useStreamedCopy;
     }
 
     /**
