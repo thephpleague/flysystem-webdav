@@ -200,10 +200,70 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
 
     public function testCreateDir()
     {
+        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('MKCOL', 'dirname')->once()->andReturn([
-            'statusCode' => 201,
-        ]);
+
+        $mock->shouldReceive('propFind')
+            ->once()
+            ->andThrow(new \Sabre\DAV\Exception('Not found'));
+
+        $mock->shouldReceive('request')
+            ->once()
+            ->with('MKCOL', 'dirname')
+            ->andReturn([
+                'statusCode' => 201,
+            ]);
+
+        $adapter = new WebDAVAdapter($mock);
+        $result = $adapter->createDir('dirname', new Config());
+        $this->assertInternalType('array', $result);
+    }
+
+    public function testCreateDirRecursive()
+    {
+        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
+        $mock = $this->getClient();
+
+        $mock->shouldReceive('propFind')
+            ->times(2)
+            ->andThrow(new \Sabre\DAV\Exception('Not found'));
+
+        $mock->shouldReceive('request')
+            ->once()
+            ->with('MKCOL', 'dirname')
+            ->andReturn([
+                'statusCode' => 201,
+            ]);
+
+        $mock->shouldReceive('request')
+            ->once()
+            ->with('MKCOL', 'dirname/subdirname')
+            ->andReturn([
+                'statusCode' => 201,
+            ]);
+
+        $adapter = new WebDAVAdapter($mock);
+        $result = $adapter->createDir('dirname/subdirname', new Config());
+        $this->assertInternalType('array', $result);
+    }
+
+    public function testCreateDirIfExists()
+    {
+        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
+        $mock = $this->getClient();
+
+        $mock->shouldReceive('propFind')
+            ->once()
+            ->andReturn([
+                '{DAV:}displayname' => 'dirname',
+                '{DAV:}getcontentlength' => 30,
+                '{DAV:}getcontenttype' => 'dir',
+                '{DAV:}getlastmodified' => date('Y-m-d H:i:s'),
+            ]);
+
+        $mock->shouldReceive('request')
+            ->never();
+
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
         $this->assertInternalType('array', $result);
@@ -211,10 +271,20 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
 
     public function testCreateDirFail()
     {
+        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('MKCOL', 'dirname')->once()->andReturn([
-            'statusCode' => 500,
-        ]);
+
+        $mock->shouldReceive('propFind')
+            ->once()
+            ->andThrow(new \Sabre\DAV\Exception('Not found'));
+
+        $mock->shouldReceive('request')
+            ->once()
+            ->with('MKCOL', 'dirname')
+            ->andReturn([
+                'statusCode' => 500,
+            ]);
+
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
         $this->assertFalse($result);

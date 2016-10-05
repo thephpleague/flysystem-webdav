@@ -215,14 +215,31 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function createDir($path, Config $config)
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $encodedPath = $this->encodePath($path);
+        $path = trim($path, '/');
+
+        $result = compact('path') + ['type' => 'dir'];
+
+        if ($path === '' || $path === '.' || $this->has($path)) {
+            return $result;
+        }
+
+        $directories = explode('/', $path);
+        if (count($directories) > 1) {
+            $parentDirectories = array_splice($directories, 0, count($directories) - 1);
+            if (!$this->createDir(implode('/', $parentDirectories), $config)) {
+                return false;
+            }
+        }
+
+        $location = $this->applyPathPrefix($encodedPath);
         $response = $this->client->request('MKCOL', $location);
 
         if ($response['statusCode'] !== 201) {
             return false;
         }
 
-        return compact('path') + ['type' => 'dir'];
+        return $result;
     }
 
     /**
