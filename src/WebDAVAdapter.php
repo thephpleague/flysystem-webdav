@@ -135,6 +135,10 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
+        if (!$this->createDir(dirname($path), $config)) {
+            return false;
+        }
+
         $location = $this->applyPathPrefix($this->encodePath($path));
         $response = $this->client->request('PUT', $location, $contents);
 
