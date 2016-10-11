@@ -333,6 +333,10 @@ class WebDAVAdapter extends AbstractAdapter
      */
     protected function nativeCopy($path, $newPath)
     {
+        if (!$this->createDir(dirname($newPath), new Config())) {
+            return false;
+        }
+
         $location = $this->applyPathPrefix($this->encodePath($path));
         $newLocation = $this->applyPathPrefix($this->encodePath($newPath));
 
