@@ -135,7 +135,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
-        if (!$this->createDir(dirname($path), $config)) {
+        if (!$this->createDir(Util::dirname($path), $config)) {
             return false;
         }
 
@@ -224,7 +224,7 @@ class WebDAVAdapter extends AbstractAdapter
 
         $result = compact('path') + ['type' => 'dir'];
 
-        if ($path === '' || $path === '.' || $this->has($path)) {
+        if (Util::normalizeDirname($path) === '' || $this->has($path)) {
             return $result;
         }
 
@@ -333,7 +333,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     protected function nativeCopy($path, $newPath)
     {
-        if (!$this->createDir(dirname($newPath), new Config())) {
+        if (!$this->createDir(Util::dirname($newPath), new Config())) {
             return false;
         }
 
