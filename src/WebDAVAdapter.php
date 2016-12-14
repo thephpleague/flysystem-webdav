@@ -18,7 +18,9 @@ use Sabre\HTTP\HttpException;
 class WebDAVAdapter extends AbstractAdapter
 {
     use StreamedTrait;
-    use StreamedCopyTrait;
+    use StreamedCopyTrait {
+        StreamedCopyTrait::copy as streamedCopy;
+    }
     use NotSupportingVisibilityTrait;
 
     /**
@@ -37,15 +39,22 @@ class WebDAVAdapter extends AbstractAdapter
     protected $client;
 
     /**
+     * @var bool
+     */
+    protected $useStreamedCopy = true;
+
+    /**
      * Constructor.
      *
      * @param Client $client
      * @param string $prefix
+     * @param bool $useStreamedCopy
      */
-    public function __construct(Client $client, $prefix = null)
+    public function __construct(Client $client, $prefix = null, $useStreamedCopy = true)
     {
         $this->client = $client;
         $this->setPathPrefix($prefix);
+        $this->setUseStreamedCopy($useStreamedCopy);
     }
 
     /**
@@ -126,6 +135,10 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function write($path, $contents, Config $config)
     {
+        if (!$this->createDir(Util::dirname($path), $config)) {
+            return false;
+        }
+
         $location = $this->applyPathPrefix($this->encodePath($path));
         $response = $this->client->request('PUT', $location, $contents);
 
@@ -176,6 +189,18 @@ class WebDAVAdapter extends AbstractAdapter
     /**
      * {@inheritdoc}
      */
+    public function copy($path, $newpath)
+    {
+        if ($this->useStreamedCopy === true) {
+            return $this->streamedCopy($path, $newpath);
+        } else {
+            return $this->nativeCopy($path, $newpath);
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
     public function delete($path)
     {
         $location = $this->applyPathPrefix($this->encodePath($path));
@@ -194,14 +219,31 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function createDir($path, Config $config)
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $encodedPath = $this->encodePath($path);
+        $path = trim($path, '/');
+
+        $result = compact('path') + ['type' => 'dir'];
+
+        if (Util::normalizeDirname($path) === '' || $this->has($path)) {
+            return $result;
+        }
+
+        $directories = explode('/', $path);
+        if (count($directories) > 1) {
+            $parentDirectories = array_splice($directories, 0, count($directories) - 1);
+            if (!$this->createDir(implode('/', $parentDirectories), $config)) {
+                return false;
+            }
+        }
+
+        $location = $this->applyPathPrefix($encodedPath);
         $response = $this->client->request('MKCOL', $location);
 
         if ($response['statusCode'] !== 201) {
             return false;
         }
 
-        return compact('path') + ['type' => 'dir'];
+        return $result;
     }
 
     /**
@@ -263,6 +305,55 @@ class WebDAVAdapter extends AbstractAdapter
     public function getMimetype($path)
     {
         return $this->getMetadata($path);
+    }
+
+    /**
+     * @return boolean
+     */
+    public function getUseStreamedCopy()
+    {
+        return $this->useStreamedCopy;
+    }
+
+    /**
+     * @param boolean $useStreamedCopy
+     */
+    public function setUseStreamedCopy($useStreamedCopy)
+    {
+        $this->useStreamedCopy = (bool)$useStreamedCopy;
+    }
+
+    /**
+     * Copy a file through WebDav COPY method.
+     *
+     * @param string $path
+     * @param string $newPath
+     *
+     * @return bool
+     */
+    protected function nativeCopy($path, $newPath)
+    {
+        if (!$this->createDir(Util::dirname($newPath), new Config())) {
+            return false;
+        }
+
+        $location = $this->applyPathPrefix($this->encodePath($path));
+        $newLocation = $this->applyPathPrefix($this->encodePath($newPath));
+
+        try {
+            $destination = $this->client->getAbsoluteUrl($newLocation);
+            $response = $this->client->request('COPY', '/'.ltrim($location, '/'), null, [
+                'Destination' => $destination,
+            ]);
+
+            if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
+                return true;
+            }
+        } catch (NotFound $e) {
+            // Would have returned false here, but would be redundant
+        }
+
+        return false;
     }
 
     /**
