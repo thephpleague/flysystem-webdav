@@ -1,5 +1,11 @@
 # Changelog
 
+### 1.0.5 - 2016-12-14
+
+### Fixed
+
+* Copy now also works with native webdav capabilities.
+
 ## 1.0.4 - 2016-08-11
 
 ### Fixed
