@@ -6,6 +6,9 @@ use League\Flysystem\WebDAV\WebDAVAdapter;
 
 class WebDAVTests extends PHPUnit_Framework_TestCase
 {
+    /**
+     * @return \Mockery\MockInterface|\Sabre\DAV\Client
+     */
     protected function getClient()
     {
         return Mockery::mock('Sabre\DAV\Client');
@@ -266,6 +269,17 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
 
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
+        $this->assertInternalType('array', $result);
+    }
+
+    public function testCreateDirWhichContainsSpaces()
+    {
+        $mock = $this->getClient();
+        $mock->shouldReceive('request')->with('MKCOL', 'dirname%20with%20spaces')->once()->andReturn([
+            'statusCode' => 201,
+        ]);
+        $adapter = new WebDAVAdapter($mock);
+        $result = $adapter->createDir('dirname with spaces', new Config());
         $this->assertInternalType('array', $result);
     }
 
