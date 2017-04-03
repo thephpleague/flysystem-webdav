@@ -154,15 +154,20 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
         $first = [
             [],
             'filename' => [
-                '{DAV:}getcontentlength' => 20,
+                '{DAV:}getcontentlength' => "20",
+                '{DAV:}iscollection' => "0",
             ],
-            'dirname' => [],
+            'dirname' => [
+                '{DAV:}getcontentlength' => "0",
+                '{DAV:}iscollection' => "1",
+            ],
         ];
 
         $second = [
             [],
             'deeper_filename.ext' => [
-                '{DAV:}getcontentlength' => 20,
+                '{DAV:}getcontentlength' => "20",
+                '{DAV:}iscollection' => "0",
             ],
         ];
         $mock->shouldReceive('propFind')->twice()->andReturn($first, $second);
