@@ -17,6 +17,13 @@ use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter extends AbstractAdapter
 {
+    const METADATA_FIELDS = [
+        '{DAV:}displayname',
+        '{DAV:}getcontentlength',
+        '{DAV:}getcontenttype',
+        '{DAV:}getlastmodified',
+        '{DAV:}iscollection',
+    ];
     use StreamedTrait;
     use StreamedCopyTrait {
         StreamedCopyTrait::copy as streamedCopy;
@@ -81,12 +88,7 @@ class WebDAVAdapter extends AbstractAdapter
         $location = $this->applyPathPrefix($this->encodePath($path));
 
         try {
-            $result = $this->client->propFind($location, [
-                '{DAV:}displayname',
-                '{DAV:}getcontentlength',
-                '{DAV:}getcontenttype',
-                '{DAV:}getlastmodified',
-            ]);
+            $result = $this->client->propFind($location, self::METADATA_FIELDS);
 
             return $this->normalizeObject($result, $path);
         } catch (Exception $e) {
@@ -260,12 +262,7 @@ class WebDAVAdapter extends AbstractAdapter
     public function listContents($directory = '', $recursive = false)
     {
         $location = $this->applyPathPrefix($this->encodePath($directory));
-        $response = $this->client->propFind($location . '/', [
-            '{DAV:}displayname',
-            '{DAV:}getcontentlength',
-            '{DAV:}getcontenttype',
-            '{DAV:}getlastmodified',
-        ], 1);
+        $response = $this->client->propFind($location . '/', self::METADATA_FIELDS, 1);
 
         array_shift($response);
         $result = [];
@@ -366,7 +363,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     protected function normalizeObject(array $object, $path)
     {
-        if (! isset($object['{DAV:}getcontentlength']) or $object['{DAV:}getcontentlength'] == "") {
+        if ($this->isDirectory($object)) {
             return ['type' => 'dir', 'path' => trim($path, '/')];
         }
 
@@ -380,5 +377,10 @@ class WebDAVAdapter extends AbstractAdapter
         $result['path'] = trim($path, '/');
 
         return $result;
+    }
+
+    private function isDirectory(array $object)
+    {
+        return isset($object['{DAV:}iscollection']) && $object['{DAV:}iscollection'] === '1';
     }
 }
