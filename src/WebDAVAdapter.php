@@ -12,23 +12,23 @@ use LogicException;
 use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
 use Sabre\DAV\Exception\NotFound;
-use Sabre\HTTP\ClientHttpException;
 use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter extends AbstractAdapter
 {
-    const METADATA_FIELDS = [
+    use StreamedTrait;
+    use StreamedCopyTrait {
+        StreamedCopyTrait::copy as streamedCopy;
+    }
+    use NotSupportingVisibilityTrait;
+
+    private static $metadataFields = [
         '{DAV:}displayname',
         '{DAV:}getcontentlength',
         '{DAV:}getcontenttype',
         '{DAV:}getlastmodified',
         '{DAV:}iscollection',
     ];
-    use StreamedTrait;
-    use StreamedCopyTrait {
-        StreamedCopyTrait::copy as streamedCopy;
-    }
-    use NotSupportingVisibilityTrait;
 
     /**
      * @var array
@@ -88,7 +88,7 @@ class WebDAVAdapter extends AbstractAdapter
         $location = $this->applyPathPrefix($this->encodePath($path));
 
         try {
-            $result = $this->client->propFind($location, self::METADATA_FIELDS);
+            $result = $this->client->propFind($location, self::$metadataFields);
 
             return $this->normalizeObject($result, $path);
         } catch (Exception $e) {
@@ -262,7 +262,7 @@ class WebDAVAdapter extends AbstractAdapter
     public function listContents($directory = '', $recursive = false)
     {
         $location = $this->applyPathPrefix($this->encodePath($directory));
-        $response = $this->client->propFind($location . '/', self::METADATA_FIELDS, 1);
+        $response = $this->client->propFind($location . '/', self::$metadataFields, 1);
 
         array_shift($response);
         $result = [];
