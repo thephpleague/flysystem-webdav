@@ -23,7 +23,4 @@
     <listeners>
         <listener class="Mockery\Adapter\Phpunit\TestListener" file="./vendor/mockery/mockery/library/Mockery/Adapter/Phpunit/TestListener.php"></listener>
     </listeners>
-    <php>
-        <ini name="memory_limit" value="8M"/>
-    </php>
 </phpunit>
