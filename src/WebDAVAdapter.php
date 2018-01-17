@@ -224,9 +224,10 @@ class WebDAVAdapter extends AbstractAdapter
         $location = $this->applyPathPrefix($this->encodePath($path));
 
         try {
-            $this->client->request('DELETE', $location);
+            $response =  $this->client->request('DELETE', $location)['statusCode'];
 
-            return true;
+
+            return $response >= 200 && $response < 300;
         } catch (NotFound $e) {
             return false;
         }
