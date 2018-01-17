@@ -90,6 +90,10 @@ class WebDAVAdapter extends AbstractAdapter
         try {
             $result = $this->client->propFind($location, self::$metadataFields);
 
+            if (empty($result)) {
+                return false;
+            }
+
             return $this->normalizeObject($result, $path);
         } catch (Exception $e) {
             return false;
