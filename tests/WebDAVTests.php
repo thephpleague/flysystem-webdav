@@ -61,6 +61,52 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
         $this->assertFalse($result);
     }
 
+    public function testWriteStream()
+    {
+        $mock = $this->getClient();
+        $mock->shouldReceive('request')->once()->andReturn([
+            'statusCode' => 200,
+        ]);
+        $adapter = new WebDAVAdapter($mock);
+
+        $tmp = $this->getLargeTmpStream();
+
+        $this->assertInternalType('array', $adapter->writeStream('something', $tmp, new Config()));
+
+        if (is_resource($tmp)) {
+            fclose($tmp);
+        }
+    }
+
+    protected function getLargeTmpStream()
+    {
+        $size = intval($this->getMemoryLimit() * 1.5);
+        $tmp = tmpfile();
+        fseek($tmp, $size);
+        fprintf($tmp, 'a');
+        fflush($tmp);
+
+        return $tmp;
+    }
+
+    protected function getMemoryLimit()
+    {
+        $unit_factor = [
+            ''  => 0,
+            'K' => 1,
+            'M' => 2,
+            'G' => 3,
+        ];
+
+        if (!preg_match("/^(\d+)([KMG]?)$/i", ini_get('memory_limit'), $match)) {
+            throw new Exception('invalid memory_limit?');
+        }
+
+        $limit = $match[1] * pow(1024, $unit_factor[strtoupper($match[2])]);
+
+        return $limit;
+    }
+
     public function testUpdate()
     {
         $mock = $this->getClient();
