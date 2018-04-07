@@ -231,6 +231,25 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
         $this->assertInternalType('array', $listing);
     }
 
+    public function testListContentsWithPlusInName()
+    {
+        $mock = $this->getClient();
+        $first = [
+            [],
+            'bucketname/dirname+something' => [
+                '{DAV:}getcontentlength' => "0",
+                '{DAV:}iscollection' => "1",
+            ],
+        ];
+
+        $mock->shouldReceive('propFind')->once()->andReturn($first);
+        $adapter = new WebDAVAdapter($mock, 'bucketname');
+        $listing = $adapter->listContents('', false);
+        $this->assertInternalType('array', $listing);
+        $this->assertCount(1, $listing);
+        $this->assertEquals('dirname+something', $listing[0]['path']);
+    }
+
     public function methodProvider()
     {
         return [
