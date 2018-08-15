@@ -391,7 +391,13 @@ class WebDAVAdapter extends AbstractAdapter
         $result = Util::map($object, static::$resultMap);
 
         if (isset($object['{DAV:}getlastmodified'])) {
-            $result['timestamp'] = strtotime($object['{DAV:}getlastmodified']);
+            $datestring = $object['{DAV:}getlastmodified'];
+            $result['timestamp'] = strtotime($datestring);
+            
+            if ($result['timestamp'] === false) {
+                $datestring = substr($datestring, 0, strrpos($datestring, ' '));
+                $result['timestamp'] = strtotime($datestring);
+            }
         }
 
         $result['type'] = 'file';
