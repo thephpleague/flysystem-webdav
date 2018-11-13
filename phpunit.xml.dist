@@ -10,6 +10,10 @@
          stopOnFailure="true"
          syntaxCheck="true"
 >
+    <php>
+        <ini name="memory_limit" value="128M" />
+    </php>
+
     <testsuites>
         <testsuite name="flysystem/gridfs/tests">
             <directory suffix=".php">./tests/</directory>
