@@ -107,7 +107,7 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function has($path)
     {
-        return $this->getMetadata($path);
+        return $this->getMetadata($path)['size'] ?? false;
     }
 
     /**
