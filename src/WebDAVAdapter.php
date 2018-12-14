@@ -260,7 +260,7 @@ class WebDAVAdapter extends AbstractAdapter
         }
 
         $location = $this->applyPathPrefix($encodedPath);
-        $response = $this->client->request('MKCOL', $location);
+        $response = $this->client->request('MKCOL', $location . $this->pathSeparator);
 
         if ($response['statusCode'] !== 201) {
             return false;

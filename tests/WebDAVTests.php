@@ -288,7 +288,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
 
         $mock->shouldReceive('request')
             ->once()
-            ->with('MKCOL', 'dirname')
+            ->with('MKCOL', 'dirname/')
             ->andReturn([
                 'statusCode' => 201,
             ]);
@@ -309,14 +309,14 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
 
         $mock->shouldReceive('request')
             ->once()
-            ->with('MKCOL', 'dirname')
+            ->with('MKCOL', 'dirname/')
             ->andReturn([
                 'statusCode' => 201,
             ]);
 
         $mock->shouldReceive('request')
             ->once()
-            ->with('MKCOL', 'dirname/subdirname')
+            ->with('MKCOL', 'dirname/subdirname/')
             ->andReturn([
                 'statusCode' => 201,
             ]);
@@ -359,7 +359,7 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
 
         $mock->shouldReceive('request')
             ->once()
-            ->with('MKCOL', 'dirname')
+            ->with('MKCOL', 'dirname/')
             ->andReturn([
                 'statusCode' => 500,
             ]);
