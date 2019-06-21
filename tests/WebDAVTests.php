@@ -250,6 +250,27 @@ class WebDAVTests extends PHPUnit_Framework_TestCase
         $this->assertEquals('dirname+something', $listing[0]['path']);
     }
 
+    public function testListContentsWithUrlEncodedSpaceInName()
+    {
+        $mock = $this->getClient();
+        $first = [
+            [],
+            '/My%20Library/New%20Record%201.mp3' => [
+                '{DAV:}displayname' => "New Record 1.mp3",
+                '{DAV:}getcontentlength' => "8223370",
+            ],
+        ];
+
+        $mock->shouldReceive('propFind')->once()->andReturn($first);
+        $adapter = new WebDAVAdapter($mock, '/My Library');
+        $listing = $adapter->listContents('', false);
+        $this->assertInternalType('array', $listing);
+        $this->assertCount(1, $listing);
+        $this->assertEquals('New Record 1.mp3', $listing[0]['path']);
+        $this->assertEquals('file', $listing[0]['type']);
+        $this->assertEquals('8223370', $listing[0]['size']);
+    }
+
     public function methodProvider()
     {
         return [
