@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.7 - 2019-06-23
+
+* Fixed prefix handling from listContent
+
 ## 1.0.6 - 2018-12-14
 
 ### Fixed
