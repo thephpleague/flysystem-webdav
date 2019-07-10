@@ -18,7 +18,7 @@ This is a Flysystem adapter for the WebDAV.
 composer require league/flysystem-webdav
 ```
 
-# Bootstrap
+## Bootstrap
 
 ``` php
 <?php
