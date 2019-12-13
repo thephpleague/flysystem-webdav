@@ -1,8 +1,9 @@
 # Changelog
 
-## 1.0.9 - xxx
+## 1.0.9 - 2019-11-13
 
 * Made detection of directories compliant with rfc4918 (#53).
+* Allow higher deps versions.
 
 ## 1.0.8 - 2019-07-08
 
