@@ -113,7 +113,9 @@ class WebDAVTests extends TestCase
     public function testUpdate()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once();
+        $mock->shouldReceive('request')
+            ->once()
+            ->andReturn(['statusCode' => 201]);
         $adapter = new WebDAVAdapter($mock);
         $this->assertInternalType('array', $adapter->update('something', 'something', new Config()));
     }
