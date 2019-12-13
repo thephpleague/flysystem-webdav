@@ -3,9 +3,12 @@
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 use League\Flysystem\WebDAV\WebDAVAdapter;
+use PHPUnit\Framework\TestCase;
 
-class WebDAVTests extends PHPUnit_Framework_TestCase
+class WebDAVTests extends TestCase
 {
+    use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+
     protected function getClient()
     {
         return Mockery::mock('Sabre\DAV\Client');
