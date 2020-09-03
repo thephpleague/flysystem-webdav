@@ -276,7 +276,8 @@ class WebDAVAdapter extends AbstractAdapter
      */
     public function deleteDir($dirname)
     {
-        return $this->delete($dirname);
+        $path = rtrim($dirname, $this->pathSeparator) . $this->pathSeparator;
+        return $this->delete($path);
     }
 
     /**
