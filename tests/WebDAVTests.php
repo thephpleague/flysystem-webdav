@@ -50,7 +50,7 @@ class WebDAVTests extends TestCase
             'statusCode' => 200,
         ]);
         $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->write('something', 'something', new Config()));
+        $this->assertIsArray($adapter->write('something', 'something', new Config()));
     }
 
     public function testWriteFail()
@@ -74,7 +74,7 @@ class WebDAVTests extends TestCase
 
         $tmp = $this->getLargeTmpStream();
 
-        $this->assertInternalType('array', $adapter->writeStream('something', $tmp, new Config()));
+        $this->assertIsArray($adapter->writeStream('something', $tmp, new Config()));
 
         if (is_resource($tmp)) {
             fclose($tmp);
@@ -117,12 +117,9 @@ class WebDAVTests extends TestCase
             ->once()
             ->andReturn(['statusCode' => 201]);
         $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->update('something', 'something', new Config()));
+        $this->assertIsArray($adapter->update('something', 'something', new Config()));
     }
 
-    /**
-     * @expectedException LogicException
-     */
     public function testWriteVisibility()
     {
         $mock = $this->getClient();
@@ -130,7 +127,8 @@ class WebDAVTests extends TestCase
             'statusCode' => 200,
         ]);
         $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->write('something', 'something', new Config([
+        $this->expectException(LogicException::class);
+        $this->assertIsArray($adapter->write('something', 'something', new Config([
             'visibility' => 'private',
         ])));
     }
@@ -147,7 +145,7 @@ class WebDAVTests extends TestCase
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->readStream('file.txt');
-        $this->assertInternalType('resource', $result['stream']);
+        $this->assertIsResource($result['stream']);
     }
 
     public function testRename()
@@ -233,7 +231,7 @@ class WebDAVTests extends TestCase
         $mock->shouldReceive('propFind')->twice()->andReturn($first, $second);
         $adapter = new WebDAVAdapter($mock, 'bucketname');
         $listing = $adapter->listContents('', true);
-        $this->assertInternalType('array', $listing);
+        $this->assertIsArray($listing);
     }
 
     public function testListContentsWithPlusInName()
@@ -250,7 +248,7 @@ class WebDAVTests extends TestCase
         $mock->shouldReceive('propFind')->once()->andReturn($first);
         $adapter = new WebDAVAdapter($mock, 'bucketname');
         $listing = $adapter->listContents('', false);
-        $this->assertInternalType('array', $listing);
+        $this->assertIsArray($listing);
         $this->assertCount(1, $listing);
         $this->assertEquals('dirname+something', $listing[0]['path']);
     }
@@ -269,7 +267,7 @@ class WebDAVTests extends TestCase
         $mock->shouldReceive('propFind')->once()->andReturn($first);
         $adapter = new WebDAVAdapter($mock, '/My Library');
         $listing = $adapter->listContents('', false);
-        $this->assertInternalType('array', $listing);
+        $this->assertIsArray($listing);
         $this->assertCount(1, $listing);
         $this->assertEquals('New Record 1.mp3', $listing[0]['path']);
         $this->assertEquals('file', $listing[0]['type']);
@@ -300,7 +298,7 @@ class WebDAVTests extends TestCase
         ]);
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->{$method}('object.ext');
-        $this->assertInternalType('array', $result);
+        $this->assertIsArray($result);
     }
 
     public function testCreateDir()
@@ -321,7 +319,7 @@ class WebDAVTests extends TestCase
 
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
-        $this->assertInternalType('array', $result);
+        $this->assertIsArray($result);
     }
 
     public function testCreateDirRecursive()
@@ -349,7 +347,7 @@ class WebDAVTests extends TestCase
 
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname/subdirname', new Config());
-        $this->assertInternalType('array', $result);
+        $this->assertIsArray($result);
     }
 
     public function testCreateDirIfExists()
@@ -371,7 +369,7 @@ class WebDAVTests extends TestCase
 
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->createDir('dirname', new Config());
-        $this->assertInternalType('array', $result);
+        $this->assertIsArray($result);
     }
 
     public function testCreateDirFail()
@@ -407,7 +405,7 @@ class WebDAVTests extends TestCase
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
-        $this->assertInternalType('array', $result);
+        $this->assertIsArray($result);
     }
 
     public function testReadFail()
