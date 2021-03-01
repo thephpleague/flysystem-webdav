@@ -28,5 +28,5 @@ use League\Flysystem\WebDAV\WebDAVAdapter;
 
 $client = new Client($settings);
 $adapter = new WebDAVAdapter($client);
-$flysystem = new Filesystem($adapter);
+$filesystem = new Filesystem($adapter);
 ```
