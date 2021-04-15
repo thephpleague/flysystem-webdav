@@ -184,7 +184,7 @@ class WebDAVTests extends TestCase
     public function testDeleteDir()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andReturn(['statusCode' => 200]);
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname/')->once()->andReturn(['statusCode' => 200]);
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertTrue($result);
@@ -193,7 +193,7 @@ class WebDAVTests extends TestCase
     public function testDeleteDirFailNotFound()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname/')->once()->andThrow('Sabre\DAV\Exception\NotFound');
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertFalse($result);
@@ -202,7 +202,7 @@ class WebDAVTests extends TestCase
     public function testDeleteDirFailNot200Status()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andReturn(['statusCode' => 403]);
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname/')->once()->andReturn(['statusCode' => 403]);
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertFalse($result);
