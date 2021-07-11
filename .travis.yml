@@ -15,5 +15,9 @@ php:
 install:
   - travis_retry composer install --no-interaction --prefer-source
 
+before_script:
+  - docker run -d --name webdav_server -p 80:80 -e USERNAME=alice -e PASSWORD=secret1234 bytemark/webdav
+  - php wait_for_webdav_service.php
+
 script:
   - bin/phpunit --coverage-text --coverage-clover coverage.xml
