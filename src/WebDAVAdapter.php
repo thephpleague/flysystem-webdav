@@ -7,6 +7,7 @@ use League\Flysystem\Adapter\Polyfill\StreamedCopyTrait;
 use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\Config;
 use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\UnableToReadFile;
 use League\Flysystem\Util;
 use LogicException;
 use Sabre\DAV\Client;
@@ -30,16 +31,6 @@ class WebDAVAdapter implements FilesystemAdapter
         '{DAV:}getlastmodified',
         '{DAV:}iscollection',
         '{DAV:}resourcetype',
-    ];
-
-    /**
-     * @var array
-     */
-    protected static $resultMap = [
-        '{DAV:}getcontentlength' => 'size',
-        '{DAV:}getcontenttype' => 'mimetype',
-        'content-length' => 'size',
-        'content-type' => 'mimetype',
     ];
 
     /**
@@ -113,27 +104,26 @@ class WebDAVAdapter implements FilesystemAdapter
     /**
      * {@inheritdoc}
      */
-    public function read($path)
+    public function read(string $path): string
     {
-        $location = $this->encodePath($path);
-
         try {
-            $response = $this->client->request('GET', $location);
-
-            if ($response['statusCode'] !== 200) {
-                return false;
-            }
-
-            return array_merge([
-                'contents' => $response['body'],
-                'timestamp' => strtotime(is_array($response['headers']['last-modified'])
-                    ? current($response['headers']['last-modified'])
-                    : $response['headers']['last-modified']),
-                'path' => $path,
-            ], Util::map($response['headers'], static::$resultMap));
-        } catch (Exception $e) {
-            return false;
+            [
+                'body' => $body,
+                'statusCode' => $statusCode,
+                'headers' => $headers,
+            ] = $this->client->request('GET', $this->encodePath($path));
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToReadFile::fromLocation($path, '', $exception);
         }
+
+        if ($statusCode !== 200) {
+            throw UnableToReadFile::fromLocation($path, "HTTP status code is $statusCode, not 200.");
+        }
+
+        $timestamp = strtotime(current((array)$headers['last-modified']));
+        $size = $headers['content-length'] ?? $headers['{DAV:}getcontentlength'] ?? null;
+        $mimetype = $headers['content-type'] ?? $headers['{DAV:}getcontenttype'] ?? null;
+        return $body;
     }
 
     /**
@@ -387,14 +377,16 @@ class WebDAVAdapter implements FilesystemAdapter
             return ['type' => 'dir', 'path' => trim($path, '/')];
         }
 
-        $result = Util::map($object, static::$resultMap);
+        $result = [
+            'type' => 'file',
+            'path' => trim($path, '/'),
+            'size' => $object['content-length'] ?? $object['{DAV:}getcontentlength'] ?? null,
+            'mimetype' => $object['content-type'] ?? $object['{DAV:}getcontenttype'] ?? null,
+        ];
 
         if (isset($object['{DAV:}getlastmodified'])) {
             $result['timestamp'] = strtotime($object['{DAV:}getlastmodified']);
         }
-
-        $result['type'] = 'file';
-        $result['path'] = trim($path, '/');
 
         return $result;
     }
