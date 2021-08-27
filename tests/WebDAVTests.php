@@ -124,9 +124,6 @@ class WebDAVTests extends TestCase
         $this->assertInternalType('array', $adapter->update('something', 'something', new Config()));
     }
 
-    /**
-     * @expectedException LogicException
-     */
     public function testWriteVisibility()
     {
         $mock = $this->getClient();
@@ -134,9 +131,10 @@ class WebDAVTests extends TestCase
             'statusCode' => 200,
         ]);
         $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->write('something', 'something', new Config([
+        $this->expectException(LogicException::class);
+        $adapter->write('something', 'something', new Config([
             'visibility' => 'private',
-        ])));
+        ]));
     }
 
     public function testReadStream()
