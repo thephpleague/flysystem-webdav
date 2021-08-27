@@ -2,11 +2,11 @@
 
 namespace League\Flysystem\WebDAV;
 
-use League\Flysystem\Adapter\AbstractAdapter;
 use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
 use League\Flysystem\Adapter\Polyfill\StreamedCopyTrait;
 use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\Config;
+use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\Util;
 use LogicException;
 use Sabre\DAV\Client;
@@ -15,7 +15,7 @@ use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\Xml\Property\ResourceType;
 use Sabre\HTTP\HttpException;
 
-class WebDAVAdapter extends AbstractAdapter
+class WebDAVAdapter implements FilesystemAdapter
 {
     use StreamedReadingTrait;
     use StreamedCopyTrait {
