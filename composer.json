@@ -9,8 +9,8 @@
         }
     ],
     "require": {
-        "php": ">=5.6",
-        "league/flysystem": "~1.0",
+        "php": ">=7.2",
+        "league/flysystem": "~2.0",
         "sabre/dav": "~4.0|~3.1"
     },
     "require-dev": {
