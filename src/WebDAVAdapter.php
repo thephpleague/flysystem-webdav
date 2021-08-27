@@ -283,25 +283,39 @@ class WebDAVAdapter implements FilesystemAdapter
     /**
      * {@inheritdoc}
      */
-    public function listContents($directory = '', $recursive = false)
+    public function listContents(string $path, bool $deep): iterable
     {
-        $location = $this->encodePath($directory);
-        $response = $this->client->propFind($location . '/', static::$metadataFields, 1);
-
-        array_shift($response);
-        $result = [];
-
-        foreach ($response as $path => $object) {
-            $path = rawurldecode($path);
-            $object = $this->normalizeObject($object, $path);
-            $result[] = $object;
-
-            if ($recursive && $object['type'] === 'dir') {
-                $result = array_merge($result, $this->listContents($object['path'], true));
-            }
+        try {
+            $response = $this->client->propFind($this->encodePath($path) . '/', static::$metadataFields, 1);
+        } catch (ClientHttpException $exception) {
+            throw UnableToRetrieveMetadata::create($path, 'listContents', "HTTP status code is {$exception->getHttpStatus()}, not 200.", $exception);
         }
 
-        return $result;
+        array_shift($response);
+
+        foreach ($response as $rawChildPath => $object) {
+            $childPath = trim(rawurldecode($rawChildPath), '/');
+            if ($this->isDirectory($object)) {
+                yield DirectoryAttributes::fromArray([
+                    StorageAttributes::ATTRIBUTE_PATH => $childPath
+                ]);
+                if ($deep) {
+                    yield from $this->listContents($childPath, true);
+                }
+            } else {
+                $lastModified = $object['{DAV:}getlastmodified'] ?? null;
+                $fileSize = $object['content-length'] ?? $object['{DAV:}getcontentlength'] ?? null;
+                if ($fileSize !== null) {
+                    $fileSize = (int)$fileSize;
+                }
+                yield FileAttributes::fromArray([
+                    StorageAttributes::ATTRIBUTE_PATH => $childPath,
+                    StorageAttributes::ATTRIBUTE_FILE_SIZE => $fileSize,
+                    StorageAttributes::ATTRIBUTE_LAST_MODIFIED => $lastModified !== null ? strtotime($lastModified) : null,
+                    StorageAttributes::ATTRIBUTE_MIME_TYPE => $object['content-type'] ?? $object['{DAV:}getcontenttype'] ?? null,
+                ]);
+            }
+        }
     }
 
     /**
