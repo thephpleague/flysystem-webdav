@@ -89,7 +89,7 @@ class WebDAVTests extends TestCase
 
     protected function getLargeTmpStream()
     {
-        $size = intval($this->getMemoryLimit() * 1.5);
+        $size = (int)($this->getMemoryLimit() * 1.5);
         $tmp = tmpfile();
         fseek($tmp, $size);
         fprintf($tmp, 'a');
@@ -108,12 +108,10 @@ class WebDAVTests extends TestCase
         ];
 
         if (!preg_match("/^(\d+)([KMG]?)$/i", ini_get('memory_limit'), $match)) {
-            throw new Exception('invalid memory_limit?');
+            throw new UnexpectedValueException('invalid memory_limit?');
         }
 
-        $limit = $match[1] * pow(1024, $unit_factor[strtoupper($match[2])]);
-
-        return $limit;
+        return $match[1] * (1024 ** $unit_factor[strtoupper($match[2])]);
     }
 
     public function testUpdate()
@@ -438,6 +436,7 @@ class WebDAVTests extends TestCase
             ],
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
+        /** @var resource|false $result */
         $result = $adapter->readStream('file.txt');
         $this->assertFalse($result);
     }
