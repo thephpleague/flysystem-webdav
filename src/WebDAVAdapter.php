@@ -20,6 +20,7 @@ use LogicException;
 use RuntimeException;
 use Sabre\DAV\Client;
 use Sabre\DAV\Xml\Property\ResourceType;
+use Sabre\HTTP\ClientException;
 use Sabre\HTTP\ClientHttpException;
 
 class WebDAVAdapter implements FilesystemAdapter
@@ -83,7 +84,7 @@ class WebDAVAdapter implements FilesystemAdapter
 
         try {
             $result = $this->client->propFind($location, static::$metadataFields);
-        } catch (ClientHttpException $exception) {
+        } catch (ClientException | ClientHttpException $exception) {
             throw UnableToRetrieveMetadata::create($path, $metadataType, '', $exception);
         }
 
@@ -175,7 +176,7 @@ class WebDAVAdapter implements FilesystemAdapter
         $location = $this->encodePath($path);
         try {
             $this->client->request('PUT', $location, $contents);
-        } catch (ClientHttpException $exception) {
+        } catch (ClientException | ClientHttpException $exception) {
             throw UnableToWriteFile::atLocation($path, '', $exception);
         }
     }
@@ -208,7 +209,7 @@ class WebDAVAdapter implements FilesystemAdapter
             ['statusCode' => $statusCode] = $this->client->request('MOVE', '/' . ltrim($location, '/'), null, [
                 'Destination' => '/' . ltrim($newLocation, '/'),
             ]);
-        } catch (ClientHttpException $exception) {
+        } catch (ClientException | ClientHttpException $exception) {
             throw UnableToMoveFile::fromLocationTo($source, $destination, $exception);
         }
         if ($statusCode < 200 || 300 <= $statusCode) {
@@ -234,7 +235,7 @@ class WebDAVAdapter implements FilesystemAdapter
 
         try {
             ['statusCode' => $statusCode] = $this->client->request('DELETE', $location);
-        } catch (ClientHttpException $exception) {
+        } catch (ClientException | ClientHttpException $exception) {
             throw $exceptionToThrow::atLocation($path, '', $exception);
         }
 
@@ -288,8 +289,8 @@ class WebDAVAdapter implements FilesystemAdapter
     {
         try {
             $response = $this->client->propFind($this->encodePath($path) . '/', static::$metadataFields, 1);
-        } catch (ClientHttpException $exception) {
-            throw UnableToRetrieveMetadata::create($path, 'listContents', "HTTP status code is {$exception->getHttpStatus()}, not 200.", $exception);
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToRetrieveMetadata::create($path, 'listContents', '', $exception);
         }
 
         array_shift($response);
@@ -380,7 +381,7 @@ class WebDAVAdapter implements FilesystemAdapter
             ['statusCode' => $statusCode] = $this->client->request('COPY', '/' . ltrim($location, '/'), null, [
                 'Destination' => $this->client->getAbsoluteUrl($this->encodePath($destination)),
             ]);
-        } catch (ClientHttpException $exception) {
+        } catch (ClientException | ClientHttpException $exception) {
             throw UnableToCopyFile::fromLocationTo($source, $destination, $exception);
         }
 
