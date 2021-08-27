@@ -8,6 +8,11 @@ use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\StorageAttributes;
+use League\Flysystem\UnableToCopyFile;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
+use League\Flysystem\UnableToDeleteFile;
+use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\Util;
@@ -200,88 +205,86 @@ class WebDAVAdapter implements FilesystemAdapter
     /**
      * {@inheritdoc}
      */
-    public function rename($path, $newpath)
+    public function move(string $source, string $destination, Config $config): void
     {
-        $location = $this->encodePath($path);
-        $newLocation = $this->encodePath($newpath);
+        $location = $this->encodePath($source);
+        $newLocation = $this->encodePath($destination);
 
         try {
-            $response = $this->client->request('MOVE', '/'.ltrim($location, '/'), null, [
-                'Destination' => '/'.ltrim($newLocation, '/'),
+            ['statusCode' => $statusCode] = $this->client->request('MOVE', '/' . ltrim($location, '/'), null, [
+                'Destination' => '/' . ltrim($newLocation, '/'),
             ]);
-
-            if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
-                return true;
-            }
-        } catch (NotFound $e) {
-            // Would have returned false here, but would be redundant
+        } catch (ClientHttpException $exception) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination, $exception);
         }
-
-        return false;
+        if ($statusCode < 200 || 300 <= $statusCode) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function copy($path, $newpath)
+    public function copy(string $source, string $destination, Config $config): void
     {
-        return $this->nativeCopy($path, $newpath);
+        $this->nativeCopy($source, $destination, $config);
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $path
+     * @param string|UnableToDeleteFile|UnableToDeleteDirectory $exceptionToThrow
      */
-    public function delete($path)
+    public function deleteImpl(string $path, string $exceptionToThrow): void
     {
         $location = $this->encodePath($path);
 
         try {
-            $response =  $this->client->request('DELETE', $location)['statusCode'];
-
-
-            return $response >= 200 && $response < 300;
-        } catch (NotFound $e) {
-            return false;
+            ['statusCode' => $statusCode] = $this->client->request('DELETE', $location);
+        } catch (ClientHttpException $exception) {
+            throw $exceptionToThrow::atLocation($path, '', $exception);
         }
+
+        if ($statusCode < 200 || 300 <= $statusCode) {
+            throw $exceptionToThrow::atLocation($path);
+        }
+    }
+
+    public function delete(string $path): void
+    {
+        $this->deleteImpl($path, UnableToDeleteFile::class);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createDir($path, Config $config)
+    public function createDirectory(string $path, Config $config): void
     {
         $encodedPath = $this->encodePath($path);
         $path = trim($path, '/');
 
-        $result = compact('path') + ['type' => 'dir'];
-
-        if (Util::normalizeDirname($path) === '' || $this->has($path)) {
-            return $result;
+        if ($path === '.' || $path === '' || $this->fileExists($path)) {
+            return;
         }
 
         $directories = explode('/', $path);
         if (count($directories) > 1) {
             $parentDirectories = array_splice($directories, 0, count($directories) - 1);
-            if (!$this->createDir(implode('/', $parentDirectories), $config)) {
-                return false;
-            }
+            $this->createDirectory(implode('/', $parentDirectories), $config);
         }
 
-        $response = $this->client->request('MKCOL', $encodedPath . '/');
+        ['statusCode' => $statusCode] = $this->client->request('MKCOL', $encodedPath . '/');
 
-        if ($response['statusCode'] !== 201) {
-            return false;
+        if ($statusCode !== 201) {
+            throw UnableToCreateDirectory::atLocation($path);
         }
-
-        return $result;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function deleteDir($dirname)
+    public function deleteDirectory(string $path): void
     {
-        return $this->delete($dirname);
+        $this->deleteImpl($path, UnableToDeleteDirectory::class);
     }
 
     /**
@@ -366,34 +369,30 @@ class WebDAVAdapter implements FilesystemAdapter
     /**
      * Copy a file through WebDav COPY method.
      *
-     * @param string $path
-     * @param string $newPath
-     *
-     * @return bool
+     * @param string $source
+     * @param string $destination
+     * @throws FilesystemException
      */
-    protected function nativeCopy($path, $newPath)
+    protected function nativeCopy(string $source, string $destination, Config $config): void
     {
-        if (!$this->createDir(Util::dirname($newPath), new Config())) {
-            return false;
+        $directory = dirname($destination);
+        if ($directory === '.') {
+            $directory = '';
         }
+        $this->createDirectory($directory, $config);
 
-        $location = $this->encodePath($path);
-        $newLocation = $this->encodePath($newPath);
-
+        $location = $this->encodePath($source);
         try {
-            $destination = $this->client->getAbsoluteUrl($newLocation);
-            $response = $this->client->request('COPY', '/'.ltrim($location, '/'), null, [
-                'Destination' => $destination,
+            ['statusCode' => $statusCode] = $this->client->request('COPY', '/' . ltrim($location, '/'), null, [
+                'Destination' => $this->client->getAbsoluteUrl($this->encodePath($destination)),
             ]);
-
-            if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
-                return true;
-            }
-        } catch (NotFound $e) {
-            // Would have returned false here, but would be redundant
+        } catch (ClientHttpException $exception) {
+            throw UnableToCopyFile::fromLocationTo($source, $destination, $exception);
         }
 
-        return false;
+        if ($statusCode < 200 || 300 <= $statusCode) {
+            throw UnableToCopyFile::fromLocationTo($source, $destination);
+        }
     }
 
     /**
