@@ -73,13 +73,13 @@ class WebDAVAdapter extends AbstractAdapter
      *
      * @return string
      */
-    protected function encodePath($path)
+    protected function encodePath(string $path): string
 	{
-		$a = explode('/', $path);
-		for ($i=0; $i<count($a); $i++) {
-			$a[$i] = rawurlencode($a[$i]);
-		}
-		return implode('/', $a);
+		$parts = explode('/', $path);
+        foreach ($parts as &$part) {
+            $part = rawurlencode($part);
+        }
+		return implode('/', $parts);
 	}
 
     /**
