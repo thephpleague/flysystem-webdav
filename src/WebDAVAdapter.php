@@ -397,12 +397,11 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     protected function isDirectory(array $object)
     {
-        if (isset($object['{DAV:}resourcetype'])) {
-            /** @var ResourceType $resourceType */
-            $resourceType = $object['{DAV:}resourcetype'];
+        $resourceType = $object['{DAV:}resourcetype'] ?? null;
+        if ($resourceType instanceof ResourceType) {
             return $resourceType->is('{DAV:}collection');
         }
 
-        return isset($object['{DAV:}iscollection']) && $object['{DAV:}iscollection'] === '1';
+        return ($object['{DAV:}iscollection'] ?? null) === '1';
     }
 }
