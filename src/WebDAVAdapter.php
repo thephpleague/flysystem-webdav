@@ -56,13 +56,11 @@ class WebDAVAdapter implements FilesystemAdapter
      * Constructor.
      *
      * @param Client $client
-     * @param string $prefix
      * @param bool $useStreamedCopy
      */
-    public function __construct(Client $client, $prefix = null, $useStreamedCopy = true)
+    public function __construct(Client $client, $useStreamedCopy = true)
     {
         $this->client = $client;
-        $this->setPathPrefix($prefix);
         $this->setUseStreamedCopy($useStreamedCopy);
     }
 
@@ -87,7 +85,7 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function getMetadata($path)
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $location = $this->encodePath($path);
 
         try {
             $result = $this->client->propFind($location, static::$metadataFields);
@@ -117,7 +115,7 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function read($path)
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $location = $this->encodePath($path);
 
         try {
             $response = $this->client->request('GET', $location);
@@ -147,7 +145,7 @@ class WebDAVAdapter implements FilesystemAdapter
             return false;
         }
 
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $location = $this->encodePath($path);
         $response = $this->client->request('PUT', $location, $contents);
 
         if ($response['statusCode'] >= 400) {
@@ -192,8 +190,8 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function rename($path, $newpath)
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
-        $newLocation = $this->applyPathPrefix($this->encodePath($newpath));
+        $location = $this->encodePath($path);
+        $newLocation = $this->encodePath($newpath);
 
         try {
             $response = $this->client->request('MOVE', '/'.ltrim($location, '/'), null, [
@@ -227,7 +225,7 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function delete($path)
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $location = $this->encodePath($path);
 
         try {
             $response =  $this->client->request('DELETE', $location)['statusCode'];
@@ -261,8 +259,7 @@ class WebDAVAdapter implements FilesystemAdapter
             }
         }
 
-        $location = $this->applyPathPrefix($encodedPath);
-        $response = $this->client->request('MKCOL', $location . $this->pathSeparator);
+        $response = $this->client->request('MKCOL', $encodedPath . '/');
 
         if ($response['statusCode'] !== 201) {
             return false;
@@ -284,14 +281,14 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function listContents($directory = '', $recursive = false)
     {
-        $location = $this->applyPathPrefix($this->encodePath($directory));
+        $location = $this->encodePath($directory);
         $response = $this->client->propFind($location . '/', static::$metadataFields, 1);
 
         array_shift($response);
         $result = [];
 
         foreach ($response as $path => $object) {
-            $path = $this->removePathPrefix(rawurldecode($path));
+            $path = rawurldecode($path);
             $object = $this->normalizeObject($object, $path);
             $result[] = $object;
 
@@ -357,8 +354,8 @@ class WebDAVAdapter implements FilesystemAdapter
             return false;
         }
 
-        $location = $this->applyPathPrefix($this->encodePath($path));
-        $newLocation = $this->applyPathPrefix($this->encodePath($newPath));
+        $location = $this->encodePath($path);
+        $newLocation = $this->encodePath($newPath);
 
         try {
             $destination = $this->client->getAbsoluteUrl($newLocation);
