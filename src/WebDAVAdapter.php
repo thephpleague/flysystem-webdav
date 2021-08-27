@@ -4,12 +4,12 @@ namespace League\Flysystem\WebDAV;
 
 use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
 use League\Flysystem\Adapter\Polyfill\StreamedCopyTrait;
-use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\Config;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\Util;
 use LogicException;
+use RuntimeException;
 use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
 use Sabre\DAV\Exception\NotFound;
@@ -18,7 +18,6 @@ use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter implements FilesystemAdapter
 {
-    use StreamedReadingTrait;
     use StreamedCopyTrait {
         StreamedCopyTrait::copy as streamedCopy;
     }
@@ -124,6 +123,22 @@ class WebDAVAdapter implements FilesystemAdapter
         $size = $headers['content-length'] ?? $headers['{DAV:}getcontentlength'] ?? null;
         $mimetype = $headers['content-type'] ?? $headers['{DAV:}getcontenttype'] ?? null;
         return $body;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function readStream(string $path)
+    {
+        $data = $this->read($path);
+
+        $stream = fopen('php://temp', 'w+b');
+        if ($stream === false) {
+            throw new RuntimeException("opening temporary stream failed");
+        }
+        fwrite($stream, $data);
+        rewind($stream);
+        return $stream;
     }
 
     /**
