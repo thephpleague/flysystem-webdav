@@ -45,6 +45,7 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function __construct(Client $client)
     {
+        $client->setThrowExceptions(true);
         $this->client = $client;
     }
 
