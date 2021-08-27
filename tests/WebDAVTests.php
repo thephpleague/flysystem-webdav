@@ -12,6 +12,9 @@ class WebDAVTests extends TestCase
 {
     use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
+    /**
+     * @return Mockery\LegacyMockInterface|Mockery\MockInterface|Client
+     */
     protected function getClient()
     {
         return Mockery::mock(Client::class);
@@ -308,7 +311,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDir()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -329,7 +331,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDirRecursive()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -357,7 +358,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDirIfExists()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -379,7 +379,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDirFail()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -454,7 +453,6 @@ class WebDAVTests extends TestCase
 
     public function testNativeCopy()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $clientMock */
         $clientMock = $this->getClient();
 
         $clientMock->shouldReceive('getAbsoluteUrl')->andReturn('http://webdav.local/prefix/newFile.txt');
