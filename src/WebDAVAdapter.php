@@ -15,7 +15,7 @@ use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
-use League\Flysystem\Util;
+use League\Flysystem\UnableToWriteFile;
 use LogicException;
 use RuntimeException;
 use Sabre\DAV\Client;
@@ -154,52 +154,45 @@ class WebDAVAdapter implements FilesystemAdapter
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $path
+     * @param string|resource $contents
+     * @param Config $config
+     * @throws FilesystemException
      */
-    public function write($path, $contents, Config $config)
+    protected function writeImpl(string $path, $contents, Config $config): void
     {
-        if (!$this->createDir(Util::dirname($path), $config)) {
-            return false;
-        }
-
-        $location = $this->encodePath($path);
-        $response = $this->client->request('PUT', $location, $contents);
-
-        if ($response['statusCode'] >= 400) {
-            return false;
-        }
-
-        $result = compact('path', 'contents');
-
-        if ($config->get('visibility')) {
+        if ($config->get(StorageAttributes::ATTRIBUTE_VISIBILITY)) {
             throw new LogicException(__CLASS__.' does not support visibility settings.');
         }
 
-        return $result;
+        $directory = dirname($path);
+        if ($directory === '.') {
+            $directory = '';
+        }
+        $this->createDirectory($directory, $config);
+
+        $location = $this->encodePath($path);
+        try {
+            $this->client->request('PUT', $location, $contents);
+        } catch (ClientHttpException $exception) {
+            throw UnableToWriteFile::atLocation($path, '', $exception);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function writeStream($path, $resource, Config $config)
+    public function write(string $path, string $contents, Config $config): void
     {
-        return $this->write($path, $resource, $config);
+        $this->writeImpl($path, $contents, $config);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function update($path, $contents, Config $config)
+    public function writeStream(string $path, $contents, Config $config): void
     {
-        return $this->write($path, $contents, $config);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function updateStream($path, $resource, Config $config)
-    {
-        return $this->update($path, $resource, $config);
+        $this->writeImpl($path, $contents, $config);
     }
 
     /**
