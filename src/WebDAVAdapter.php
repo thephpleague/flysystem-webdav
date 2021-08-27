@@ -6,6 +6,7 @@ use League\Flysystem\Config;
 use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\FilesystemException;
 use League\Flysystem\StorageAttributes;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
@@ -13,11 +14,8 @@ use League\Flysystem\Util;
 use LogicException;
 use RuntimeException;
 use Sabre\DAV\Client;
-use Sabre\DAV\Exception;
-use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\Xml\Property\ResourceType;
 use Sabre\HTTP\ClientHttpException;
-use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter implements FilesystemAdapter
 {
@@ -73,34 +71,40 @@ class WebDAVAdapter implements FilesystemAdapter
         throw new LogicException("$class does not support visibility. Path: $path, visibility: $visibility");
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getMetadata($path)
+    private function getMetadata(string $path, string $metadataType): ?StorageAttributes
     {
         $location = $this->encodePath($path);
 
         try {
             $result = $this->client->propFind($location, static::$metadataFields);
-
-            if (empty($result)) {
-                return false;
-            }
-
-            return $this->normalizeObject($result, $path);
-        } catch (Exception $e) {
-            return false;
-        } catch (HttpException $e) {
-            return false;
+        } catch (ClientHttpException $exception) {
+            throw UnableToRetrieveMetadata::create($path, $metadataType, '', $exception);
         }
+
+        if (empty($result)) {
+            return null;
+        }
+
+        $path = trim($path, '/');
+        if ($this->isDirectory($result)) {
+            return DirectoryAttributes::fromArray([StorageAttributes::ATTRIBUTE_PATH => $path]);
+        }
+        $lastModified = $object['{DAV:}getlastmodified'] ?? null;
+        return FileAttributes::fromArray([
+            StorageAttributes::ATTRIBUTE_PATH => $path,
+            StorageAttributes::ATTRIBUTE_FILE_SIZE => $object['content-length'] ?? $object['{DAV:}getcontentlength'] ?? null,
+            StorageAttributes::ATTRIBUTE_LAST_MODIFIED => $lastModified !== null ? strtotime($lastModified) : null,
+            StorageAttributes::ATTRIBUTE_MIME_TYPE => $object['content-type'] ?? $object['{DAV:}getcontenttype'] ?? null,
+        ]);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function has($path)
+    public function fileExists(string $path): bool
     {
-        return $this->getMetadata($path);
+        try {
+            return $this->getMetadata($path, 'fileExists') !== null;
+        } catch (FilesystemException $exception) {
+            return false;
+        }
     }
 
     /**
@@ -318,28 +322,45 @@ class WebDAVAdapter implements FilesystemAdapter
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getSize($path)
+    private static function ensureFileAttributes(?StorageAttributes $metadata, string $path, string $metadataType): FileAttributes
     {
-        return $this->getMetadata($path);
+        if ($metadata === null) {
+            throw UnableToRetrieveMetadata::create($path, $metadataType, 'file not found');
+        }
+        if ($metadata instanceof DirectoryAttributes) {
+            throw UnableToRetrieveMetadata::create($path, $metadataType, 'not a file');
+        }
+        if ($metadata instanceof FileAttributes) {
+            return $metadata;
+        }
+        throw new LogicException("never happen");
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getTimestamp($path)
+    public function fileSize(string $path): FileAttributes
     {
-        return $this->getMetadata($path);
+        $metadata = $this->getMetadata($path, StorageAttributes::ATTRIBUTE_FILE_SIZE);
+        return self::ensureFileAttributes($metadata, $path, StorageAttributes::ATTRIBUTE_FILE_SIZE);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getMimetype($path)
+    public function lastModified(string $path): FileAttributes
     {
-        return $this->getMetadata($path);
+        $metadata = $this->getMetadata($path, StorageAttributes::ATTRIBUTE_LAST_MODIFIED);
+        return self::ensureFileAttributes($metadata, $path, StorageAttributes::ATTRIBUTE_LAST_MODIFIED);
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function mimeType(string $path): FileAttributes
+    {
+        $metadata = $this->getMetadata($path, StorageAttributes::ATTRIBUTE_MIME_TYPE);
+        return self::ensureFileAttributes($metadata, $path, StorageAttributes::ATTRIBUTE_MIME_TYPE);
     }
 
     /**
@@ -373,34 +394,6 @@ class WebDAVAdapter implements FilesystemAdapter
         }
 
         return false;
-    }
-
-    /**
-     * Normalise a WebDAV repsonse object.
-     *
-     * @param array  $object
-     * @param string $path
-     *
-     * @return array
-     */
-    protected function normalizeObject(array $object, $path)
-    {
-        if ($this->isDirectory($object)) {
-            return ['type' => 'dir', 'path' => trim($path, '/')];
-        }
-
-        $result = [
-            'type' => 'file',
-            'path' => trim($path, '/'),
-            'size' => $object['content-length'] ?? $object['{DAV:}getcontentlength'] ?? null,
-            'mimetype' => $object['content-type'] ?? $object['{DAV:}getcontenttype'] ?? null,
-        ];
-
-        if (isset($object['{DAV:}getlastmodified'])) {
-            $result['timestamp'] = strtotime($object['{DAV:}getlastmodified']);
-        }
-
-        return $result;
     }
 
     /**
