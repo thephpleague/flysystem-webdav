@@ -2,10 +2,13 @@
 
 namespace League\Flysystem\WebDAV;
 
-use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
 use League\Flysystem\Config;
+use League\Flysystem\DirectoryAttributes;
+use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\StorageAttributes;
 use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\Util;
 use LogicException;
 use RuntimeException;
@@ -13,12 +16,11 @@ use Sabre\DAV\Client;
 use Sabre\DAV\Exception;
 use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\Xml\Property\ResourceType;
+use Sabre\HTTP\ClientHttpException;
 use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter implements FilesystemAdapter
 {
-    use NotSupportingVisibilityTrait;
-
     protected static $metadataFields = [
         '{DAV:}displayname',
         '{DAV:}getcontentlength',
@@ -58,6 +60,18 @@ class WebDAVAdapter implements FilesystemAdapter
         }
 		return implode('/', $parts);
 	}
+
+    public function visibility(string $path): FileAttributes
+    {
+        $class = __CLASS__;
+        throw new LogicException("$class does not support visibility. Path: $path");
+    }
+
+    public function setVisibility(string $path, string $visibility): void
+    {
+        $class = __CLASS__;
+        throw new LogicException("$class does not support visibility. Path: $path, visibility: $visibility");
+    }
 
     /**
      * {@inheritdoc}
