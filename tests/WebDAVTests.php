@@ -1,5 +1,8 @@
 <?php
 
+use Sabre\HTTP\ClientHttpException;
+use Sabre\DAV\Exception\NotFound;
+use Sabre\DAV\Client;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 use League\Flysystem\WebDAV\WebDAVAdapter;
@@ -11,7 +14,7 @@ class WebDAVTests extends TestCase
 
     protected function getClient()
     {
-        return Mockery::mock('Sabre\DAV\Client');
+        return Mockery::mock(Client::class);
     }
 
     public function testHas()
@@ -38,8 +41,8 @@ class WebDAVTests extends TestCase
     public function provideExceptionsForHasFail()
     {
         return [
-            [Mockery::mock('Sabre\DAV\Exception\NotFound')],
-            [Mockery::mock('Sabre\HTTP\ClientHttpException')],
+            [Mockery::mock(NotFound::class)],
+            [Mockery::mock(ClientHttpException::class)],
         ];
     }
 
@@ -175,7 +178,7 @@ class WebDAVTests extends TestCase
     public function testRenameFailException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->once()->andThrow(NotFound::class);
         $adapter = new WebDAVAdapter($mock, 'bucketname');
         $result = $adapter->rename('old', 'new');
         $this->assertFalse($result);
@@ -193,7 +196,7 @@ class WebDAVTests extends TestCase
     public function testDeleteDirFailNotFound()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow(NotFound::class);
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertFalse($result);
@@ -443,7 +446,7 @@ class WebDAVTests extends TestCase
     public function testReadException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->andThrow(NotFound::class);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
         $this->assertFalse($result);
