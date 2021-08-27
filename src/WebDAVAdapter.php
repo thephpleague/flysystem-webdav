@@ -3,7 +3,6 @@
 namespace League\Flysystem\WebDAV;
 
 use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
-use League\Flysystem\Adapter\Polyfill\StreamedCopyTrait;
 use League\Flysystem\Config;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\UnableToReadFile;
@@ -18,9 +17,6 @@ use Sabre\HTTP\HttpException;
 
 class WebDAVAdapter implements FilesystemAdapter
 {
-    use StreamedCopyTrait {
-        StreamedCopyTrait::copy as streamedCopy;
-    }
     use NotSupportingVisibilityTrait;
 
     protected static $metadataFields = [
@@ -38,20 +34,13 @@ class WebDAVAdapter implements FilesystemAdapter
     protected $client;
 
     /**
-     * @var bool
-     */
-    protected $useStreamedCopy = true;
-
-    /**
      * Constructor.
      *
      * @param Client $client
-     * @param bool $useStreamedCopy
      */
-    public function __construct(Client $client, $useStreamedCopy = true)
+    public function __construct(Client $client)
     {
         $this->client = $client;
-        $this->setUseStreamedCopy($useStreamedCopy);
     }
 
     /**
@@ -218,11 +207,7 @@ class WebDAVAdapter implements FilesystemAdapter
      */
     public function copy($path, $newpath)
     {
-        if ($this->useStreamedCopy === true) {
-            return $this->streamedCopy($path, $newpath);
-        } else {
-            return $this->nativeCopy($path, $newpath);
-        }
+        return $this->nativeCopy($path, $newpath);
     }
 
     /**
@@ -327,22 +312,6 @@ class WebDAVAdapter implements FilesystemAdapter
     public function getMimetype($path)
     {
         return $this->getMetadata($path);
-    }
-
-    /**
-     * @return boolean
-     */
-    public function getUseStreamedCopy()
-    {
-        return $this->useStreamedCopy;
-    }
-
-    /**
-     * @param boolean $useStreamedCopy
-     */
-    public function setUseStreamedCopy($useStreamedCopy)
-    {
-        $this->useStreamedCopy = (bool)$useStreamedCopy;
     }
 
     /**
