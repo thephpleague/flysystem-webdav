@@ -133,9 +133,6 @@ class WebDAVAdapter implements FilesystemAdapter
             throw UnableToReadFile::fromLocation($path, "HTTP status code is $statusCode, not 200.");
         }
 
-        $timestamp = strtotime(current((array)$headers['last-modified']));
-        $size = $headers['content-length'] ?? $headers['{DAV:}getcontentlength'] ?? null;
-        $mimetype = $headers['content-type'] ?? $headers['{DAV:}getcontenttype'] ?? null;
         return $body;
     }
 
