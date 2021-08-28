@@ -2,27 +2,29 @@
 
 namespace League\Flysystem\WebDAV;
 
-use League\Flysystem\Adapter\AbstractAdapter;
-use League\Flysystem\Adapter\Polyfill\NotSupportingVisibilityTrait;
-use League\Flysystem\Adapter\Polyfill\StreamedCopyTrait;
-use League\Flysystem\Adapter\Polyfill\StreamedReadingTrait;
 use League\Flysystem\Config;
-use League\Flysystem\Util;
+use League\Flysystem\DirectoryAttributes;
+use League\Flysystem\FileAttributes;
+use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\StorageAttributes;
+use League\Flysystem\UnableToCopyFile;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
+use League\Flysystem\UnableToDeleteFile;
+use League\Flysystem\UnableToMoveFile;
+use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToRetrieveMetadata;
+use League\Flysystem\UnableToWriteFile;
 use LogicException;
+use RuntimeException;
 use Sabre\DAV\Client;
-use Sabre\DAV\Exception;
-use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\Xml\Property\ResourceType;
-use Sabre\HTTP\HttpException;
+use Sabre\HTTP\ClientException;
+use Sabre\HTTP\ClientHttpException;
 
-class WebDAVAdapter extends AbstractAdapter
+class WebDAVAdapter implements FilesystemAdapter
 {
-    use StreamedReadingTrait;
-    use StreamedCopyTrait {
-        StreamedCopyTrait::copy as streamedCopy;
-    }
-    use NotSupportingVisibilityTrait;
-
     protected static $metadataFields = [
         '{DAV:}displayname',
         '{DAV:}getcontentlength',
@@ -33,37 +35,19 @@ class WebDAVAdapter extends AbstractAdapter
     ];
 
     /**
-     * @var array
-     */
-    protected static $resultMap = [
-        '{DAV:}getcontentlength' => 'size',
-        '{DAV:}getcontenttype' => 'mimetype',
-        'content-length' => 'size',
-        'content-type' => 'mimetype',
-    ];
-
-    /**
      * @var Client
      */
     protected $client;
 
     /**
-     * @var bool
-     */
-    protected $useStreamedCopy = true;
-
-    /**
      * Constructor.
      *
      * @param Client $client
-     * @param string $prefix
-     * @param bool $useStreamedCopy
      */
-    public function __construct(Client $client, $prefix = null, $useStreamedCopy = true)
+    public function __construct(Client $client)
     {
+        $client->setThrowExceptions(true);
         $this->client = $client;
-        $this->setPathPrefix($prefix);
-        $this->setUseStreamedCopy($useStreamedCopy);
     }
 
     /**
@@ -73,67 +57,59 @@ class WebDAVAdapter extends AbstractAdapter
      *
      * @return string
      */
-    protected function encodePath($path)
+    protected function encodePath(string $path): string
 	{
-		$a = explode('/', $path);
-		for ($i=0; $i<count($a); $i++) {
-			$a[$i] = rawurlencode($a[$i]);
-		}
-		return implode('/', $a);
+		$parts = explode('/', $path);
+        foreach ($parts as &$part) {
+            $part = rawurlencode($part);
+        }
+		return implode('/', $parts);
 	}
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getMetadata($path)
+    public function visibility(string $path): FileAttributes
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $class = __CLASS__;
+        throw new LogicException("$class does not support visibility. Path: $path");
+    }
+
+    public function setVisibility(string $path, string $visibility): void
+    {
+        $class = __CLASS__;
+        throw new LogicException("$class does not support visibility. Path: $path, visibility: $visibility");
+    }
+
+    private function getMetadata(string $path, string $metadataType): ?StorageAttributes
+    {
+        $location = $this->encodePath($path);
 
         try {
             $result = $this->client->propFind($location, static::$metadataFields);
-
-            if (empty($result)) {
-                return false;
-            }
-
-            return $this->normalizeObject($result, $path);
-        } catch (Exception $e) {
-            return false;
-        } catch (HttpException $e) {
-            return false;
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToRetrieveMetadata::create($path, $metadataType, '', $exception);
         }
+
+        if (empty($result)) {
+            return null;
+        }
+
+        $path = trim($path, '/');
+        if ($this->isDirectory($result)) {
+            return DirectoryAttributes::fromArray([StorageAttributes::ATTRIBUTE_PATH => $path]);
+        }
+        $lastModified = $object['{DAV:}getlastmodified'] ?? null;
+        return FileAttributes::fromArray([
+            StorageAttributes::ATTRIBUTE_PATH => $path,
+            StorageAttributes::ATTRIBUTE_FILE_SIZE => $object['content-length'] ?? $object['{DAV:}getcontentlength'] ?? null,
+            StorageAttributes::ATTRIBUTE_LAST_MODIFIED => $lastModified !== null ? strtotime($lastModified) : null,
+            StorageAttributes::ATTRIBUTE_MIME_TYPE => $object['content-type'] ?? $object['{DAV:}getcontenttype'] ?? null,
+        ]);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function has($path)
+    public function fileExists(string $path): bool
     {
-        return $this->getMetadata($path);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function read($path)
-    {
-        $location = $this->applyPathPrefix($this->encodePath($path));
-
         try {
-            $response = $this->client->request('GET', $location);
-
-            if ($response['statusCode'] !== 200) {
-                return false;
-            }
-
-            return array_merge([
-                'contents' => $response['body'],
-                'timestamp' => strtotime(is_array($response['headers']['last-modified'])
-                    ? current($response['headers']['last-modified'])
-                    : $response['headers']['last-modified']),
-                'path' => $path,
-            ], Util::map($response['headers'], static::$resultMap));
-        } catch (Exception $e) {
+            return $this->getMetadata($path, 'fileExists') !== null;
+        } catch (FilesystemException $exception) {
             return false;
         }
     }
@@ -141,265 +117,274 @@ class WebDAVAdapter extends AbstractAdapter
     /**
      * {@inheritdoc}
      */
-    public function write($path, $contents, Config $config)
+    public function read(string $path): string
     {
-        if (!$this->createDir(Util::dirname($path), $config)) {
-            return false;
+        try {
+            [
+                'body' => $body,
+                'statusCode' => $statusCode,
+                'headers' => $headers,
+            ] = $this->client->request('GET', $this->encodePath($path));
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToReadFile::fromLocation($path, '', $exception);
         }
 
-        $location = $this->applyPathPrefix($this->encodePath($path));
-        $response = $this->client->request('PUT', $location, $contents);
-
-        if ($response['statusCode'] >= 400) {
-            return false;
+        if ($statusCode !== 200) {
+            throw UnableToReadFile::fromLocation($path, "HTTP status code is $statusCode, not 200.");
         }
 
-        $result = compact('path', 'contents');
+        return $body;
+    }
 
-        if ($config->get('visibility')) {
+    /**
+     * {@inheritdoc}
+     */
+    public function readStream(string $path)
+    {
+        $data = $this->read($path);
+
+        $stream = fopen('php://temp', 'w+b');
+        if ($stream === false) {
+            throw new RuntimeException("opening temporary stream failed");
+        }
+        fwrite($stream, $data);
+        rewind($stream);
+        return $stream;
+    }
+
+    /**
+     * @param string $path
+     * @param string|resource $contents
+     * @param Config $config
+     * @throws FilesystemException
+     */
+    protected function writeImpl(string $path, $contents, Config $config): void
+    {
+        if ($config->get(StorageAttributes::ATTRIBUTE_VISIBILITY)) {
             throw new LogicException(__CLASS__.' does not support visibility settings.');
         }
 
-        return $result;
+        $directory = dirname($path);
+        if ($directory === '.') {
+            $directory = '';
+        }
+        $this->createDirectory($directory, $config);
+
+        $location = $this->encodePath($path);
+        try {
+            $this->client->request('PUT', $location, $contents);
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToWriteFile::atLocation($path, '', $exception);
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function writeStream($path, $resource, Config $config)
+    public function write(string $path, string $contents, Config $config): void
     {
-        return $this->write($path, $resource, $config);
+        $this->writeImpl($path, $contents, $config);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function update($path, $contents, Config $config)
+    public function writeStream(string $path, $contents, Config $config): void
     {
-        return $this->write($path, $contents, $config);
+        $this->writeImpl($path, $contents, $config);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function updateStream($path, $resource, Config $config)
+    public function move(string $source, string $destination, Config $config): void
     {
-        return $this->update($path, $resource, $config);
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function rename($path, $newpath)
-    {
-        $location = $this->applyPathPrefix($this->encodePath($path));
-        $newLocation = $this->applyPathPrefix($this->encodePath($newpath));
+        $location = $this->encodePath($source);
+        $newLocation = $this->encodePath($destination);
 
         try {
-            $response = $this->client->request('MOVE', '/'.ltrim($location, '/'), null, [
-                'Destination' => '/'.ltrim($newLocation, '/'),
+            ['statusCode' => $statusCode] = $this->client->request('MOVE', '/' . ltrim($location, '/'), null, [
+                'Destination' => '/' . ltrim($newLocation, '/'),
             ]);
-
-            if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
-                return true;
-            }
-        } catch (NotFound $e) {
-            // Would have returned false here, but would be redundant
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination, $exception);
         }
-
-        return false;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function copy($path, $newpath)
-    {
-        if ($this->useStreamedCopy === true) {
-            return $this->streamedCopy($path, $newpath);
-        } else {
-            return $this->nativeCopy($path, $newpath);
+        if ($statusCode < 200 || 300 <= $statusCode) {
+            throw UnableToMoveFile::fromLocationTo($source, $destination);
         }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function delete($path)
+    public function copy(string $source, string $destination, Config $config): void
     {
-        $location = $this->applyPathPrefix($this->encodePath($path));
+        $this->nativeCopy($source, $destination, $config);
+    }
+
+    /**
+     * @param string $path
+     * @param string|UnableToDeleteFile|UnableToDeleteDirectory $exceptionToThrow
+     */
+    public function deleteImpl(string $path, string $exceptionToThrow): void
+    {
+        $location = $this->encodePath($path);
 
         try {
-            $response =  $this->client->request('DELETE', $location)['statusCode'];
-
-
-            return $response >= 200 && $response < 300;
-        } catch (NotFound $e) {
-            return false;
+            ['statusCode' => $statusCode] = $this->client->request('DELETE', $location);
+        } catch (ClientException | ClientHttpException $exception) {
+            throw $exceptionToThrow::atLocation($path, '', $exception);
         }
+
+        if ($statusCode < 200 || 300 <= $statusCode) {
+            throw $exceptionToThrow::atLocation($path);
+        }
+    }
+
+    public function delete(string $path): void
+    {
+        $this->deleteImpl($path, UnableToDeleteFile::class);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function createDir($path, Config $config)
+    public function createDirectory(string $path, Config $config): void
     {
         $encodedPath = $this->encodePath($path);
         $path = trim($path, '/');
 
-        $result = compact('path') + ['type' => 'dir'];
-
-        if (Util::normalizeDirname($path) === '' || $this->has($path)) {
-            return $result;
+        if ($path === '.' || $path === '' || $this->fileExists($path)) {
+            return;
         }
 
         $directories = explode('/', $path);
         if (count($directories) > 1) {
             $parentDirectories = array_splice($directories, 0, count($directories) - 1);
-            if (!$this->createDir(implode('/', $parentDirectories), $config)) {
-                return false;
-            }
+            $this->createDirectory(implode('/', $parentDirectories), $config);
         }
 
-        $location = $this->applyPathPrefix($encodedPath);
-        $response = $this->client->request('MKCOL', $location . $this->pathSeparator);
+        ['statusCode' => $statusCode] = $this->client->request('MKCOL', $encodedPath . '/');
 
-        if ($response['statusCode'] !== 201) {
-            return false;
+        if ($statusCode !== 201) {
+            throw UnableToCreateDirectory::atLocation($path);
         }
-
-        return $result;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function deleteDir($dirname)
+    public function deleteDirectory(string $path): void
     {
-        return $this->delete($dirname);
+        $this->deleteImpl($path, UnableToDeleteDirectory::class);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function listContents($directory = '', $recursive = false)
+    public function listContents(string $path, bool $deep): iterable
     {
-        $location = $this->applyPathPrefix($this->encodePath($directory));
-        $response = $this->client->propFind($location . '/', static::$metadataFields, 1);
+        try {
+            $response = $this->client->propFind($this->encodePath($path) . '/', static::$metadataFields, 1);
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToRetrieveMetadata::create($path, 'listContents', '', $exception);
+        }
 
         array_shift($response);
-        $result = [];
 
-        foreach ($response as $path => $object) {
-            $path = $this->removePathPrefix(rawurldecode($path));
-            $object = $this->normalizeObject($object, $path);
-            $result[] = $object;
-
-            if ($recursive && $object['type'] === 'dir') {
-                $result = array_merge($result, $this->listContents($object['path'], true));
+        foreach ($response as $rawChildPath => $object) {
+            $childPath = trim(rawurldecode($rawChildPath), '/');
+            if ($this->isDirectory($object)) {
+                yield DirectoryAttributes::fromArray([
+                    StorageAttributes::ATTRIBUTE_PATH => $childPath
+                ]);
+                if ($deep) {
+                    yield from $this->listContents($childPath, true);
+                }
+            } else {
+                $lastModified = $object['{DAV:}getlastmodified'] ?? null;
+                $fileSize = $object['content-length'] ?? $object['{DAV:}getcontentlength'] ?? null;
+                if ($fileSize !== null) {
+                    $fileSize = (int)$fileSize;
+                }
+                yield FileAttributes::fromArray([
+                    StorageAttributes::ATTRIBUTE_PATH => $childPath,
+                    StorageAttributes::ATTRIBUTE_FILE_SIZE => $fileSize,
+                    StorageAttributes::ATTRIBUTE_LAST_MODIFIED => $lastModified !== null ? strtotime($lastModified) : null,
+                    StorageAttributes::ATTRIBUTE_MIME_TYPE => $object['content-type'] ?? $object['{DAV:}getcontenttype'] ?? null,
+                ]);
             }
         }
+    }
 
-        return $result;
+    private static function ensureFileAttributes(?StorageAttributes $metadata, string $path, string $metadataType): FileAttributes
+    {
+        if ($metadata === null) {
+            throw UnableToRetrieveMetadata::create($path, $metadataType, 'file not found');
+        }
+        if ($metadata instanceof DirectoryAttributes) {
+            throw UnableToRetrieveMetadata::create($path, $metadataType, 'not a file');
+        }
+        if ($metadata instanceof FileAttributes) {
+            return $metadata;
+        }
+        throw new LogicException("never happen");
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getSize($path)
+    public function fileSize(string $path): FileAttributes
     {
-        return $this->getMetadata($path);
+        $metadata = $this->getMetadata($path, StorageAttributes::ATTRIBUTE_FILE_SIZE);
+        return self::ensureFileAttributes($metadata, $path, StorageAttributes::ATTRIBUTE_FILE_SIZE);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getTimestamp($path)
+    public function lastModified(string $path): FileAttributes
     {
-        return $this->getMetadata($path);
+        $metadata = $this->getMetadata($path, StorageAttributes::ATTRIBUTE_LAST_MODIFIED);
+        return self::ensureFileAttributes($metadata, $path, StorageAttributes::ATTRIBUTE_LAST_MODIFIED);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getMimetype($path)
+    public function mimeType(string $path): FileAttributes
     {
-        return $this->getMetadata($path);
-    }
-
-    /**
-     * @return boolean
-     */
-    public function getUseStreamedCopy()
-    {
-        return $this->useStreamedCopy;
-    }
-
-    /**
-     * @param boolean $useStreamedCopy
-     */
-    public function setUseStreamedCopy($useStreamedCopy)
-    {
-        $this->useStreamedCopy = (bool)$useStreamedCopy;
+        $metadata = $this->getMetadata($path, StorageAttributes::ATTRIBUTE_MIME_TYPE);
+        return self::ensureFileAttributes($metadata, $path, StorageAttributes::ATTRIBUTE_MIME_TYPE);
     }
 
     /**
      * Copy a file through WebDav COPY method.
      *
-     * @param string $path
-     * @param string $newPath
-     *
-     * @return bool
+     * @param string $source
+     * @param string $destination
+     * @throws FilesystemException
      */
-    protected function nativeCopy($path, $newPath)
+    protected function nativeCopy(string $source, string $destination, Config $config): void
     {
-        if (!$this->createDir(Util::dirname($newPath), new Config())) {
-            return false;
+        $directory = dirname($destination);
+        if ($directory === '.') {
+            $directory = '';
         }
+        $this->createDirectory($directory, $config);
 
-        $location = $this->applyPathPrefix($this->encodePath($path));
-        $newLocation = $this->applyPathPrefix($this->encodePath($newPath));
-
+        $location = $this->encodePath($source);
         try {
-            $destination = $this->client->getAbsoluteUrl($newLocation);
-            $response = $this->client->request('COPY', '/'.ltrim($location, '/'), null, [
-                'Destination' => $destination,
+            ['statusCode' => $statusCode] = $this->client->request('COPY', '/' . ltrim($location, '/'), null, [
+                'Destination' => $this->client->getAbsoluteUrl($this->encodePath($destination)),
             ]);
-
-            if ($response['statusCode'] >= 200 && $response['statusCode'] < 300) {
-                return true;
-            }
-        } catch (NotFound $e) {
-            // Would have returned false here, but would be redundant
+        } catch (ClientException | ClientHttpException $exception) {
+            throw UnableToCopyFile::fromLocationTo($source, $destination, $exception);
         }
 
-        return false;
-    }
-
-    /**
-     * Normalise a WebDAV repsonse object.
-     *
-     * @param array  $object
-     * @param string $path
-     *
-     * @return array
-     */
-    protected function normalizeObject(array $object, $path)
-    {
-        if ($this->isDirectory($object)) {
-            return ['type' => 'dir', 'path' => trim($path, '/')];
+        if ($statusCode < 200 || 300 <= $statusCode) {
+            throw UnableToCopyFile::fromLocationTo($source, $destination);
         }
-
-        $result = Util::map($object, static::$resultMap);
-
-        if (isset($object['{DAV:}getlastmodified'])) {
-            $result['timestamp'] = strtotime($object['{DAV:}getlastmodified']);
-        }
-
-        $result['type'] = 'file';
-        $result['path'] = trim($path, '/');
-
-        return $result;
     }
 
     /**
@@ -408,12 +393,11 @@ class WebDAVAdapter extends AbstractAdapter
      */
     protected function isDirectory(array $object)
     {
-        if (isset($object['{DAV:}resourcetype'])) {
-            /** @var ResourceType $resourceType */
-            $resourceType = $object['{DAV:}resourcetype'];
+        $resourceType = $object['{DAV:}resourcetype'] ?? null;
+        if ($resourceType instanceof ResourceType) {
             return $resourceType->is('{DAV:}collection');
         }
 
-        return isset($object['{DAV:}iscollection']) && $object['{DAV:}iscollection'] === '1';
+        return ($object['{DAV:}iscollection'] ?? null) === '1';
     }
 }
