@@ -2,45 +2,50 @@
 
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
+use League\Flysystem\UnableToMoveFile;
+use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToWriteFile;
 use League\Flysystem\WebDAV\WebDAVAdapter;
 use PHPUnit\Framework\TestCase;
+use Sabre\HTTP\Response;
 
 class WebDAVTests extends TestCase
 {
     use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
+    /**
+     * @return \Mockery\LegacyMockInterface|\Mockery\MockInterface|\Sabre\DAV\Client
+     */
     protected function getClient()
     {
-        return Mockery::mock('Sabre\DAV\Client');
+        $mock = Mockery::mock(Sabre\DAV\Client::class);
+        $mock->shouldReceive('setThrowExceptions')->once();
+        return $mock;
     }
 
-    public function testHas()
+    protected function newClientHttpException(int $httpStatus, array $headers = [], ?string $body = null)
+    {
+        return new Sabre\HTTP\ClientHttpException(new Response($httpStatus, $headers, $body));
+    }
+
+    public function testFileExists()
     {
         $mock = $this->getClient();
         $mock->shouldReceive('propFind')->once()->andReturn([
             '{DAV:}getcontentlength' => 20,
         ]);
         $adapter = new Filesystem(new WebDAVAdapter($mock));
-        $this->assertTrue($adapter->has('something'));
+        $this->assertTrue($adapter->fileExists('something'));
     }
 
-    /**
-     * @dataProvider provideExceptionsForHasFail
-     */
-    public function testHasFail($exceptionClass)
+    public function testHasFail()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('propFind')->once()->andThrow($exceptionClass);
+        $mock->shouldReceive('propFind')->once()->andThrow($this->newClientHttpException(404));
         $adapter = new WebDAVAdapter($mock);
-        $this->assertFalse($adapter->has('something'));
-    }
-
-    public function provideExceptionsForHasFail()
-    {
-        return [
-            [Mockery::mock('Sabre\DAV\Exception\NotFound')],
-            [Mockery::mock('Sabre\HTTP\ClientHttpException')],
-        ];
+        $this->assertFalse($adapter->fileExists('something'));
     }
 
     public function testWrite()
@@ -50,18 +55,16 @@ class WebDAVTests extends TestCase
             'statusCode' => 200,
         ]);
         $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->write('something', 'something', new Config()));
+        $adapter->write('something', 'something', new Config());
     }
 
     public function testWriteFail()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('PUT', 'something', 'something')->once()->andReturn([
-            'statusCode' => 500,
-        ]);
+        $mock->shouldReceive('request')->with('PUT', 'something', 'something')->once()->andThrow($this->newClientHttpException(500));
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->write('something', 'something', new Config());
-        $this->assertFalse($result);
+        $this->expectException(UnableToWriteFile::class);
+        $adapter->write('something', 'something', new Config());
     }
 
     public function testWriteStream()
@@ -74,7 +77,7 @@ class WebDAVTests extends TestCase
 
         $tmp = $this->getLargeTmpStream();
 
-        $this->assertInternalType('array', $adapter->writeStream('something', $tmp, new Config()));
+        $adapter->writeStream('something', $tmp, new Config());
 
         if (is_resource($tmp)) {
             fclose($tmp);
@@ -110,29 +113,15 @@ class WebDAVTests extends TestCase
         return $limit;
     }
 
-    public function testUpdate()
-    {
-        $mock = $this->getClient();
-        $mock->shouldReceive('request')
-            ->once()
-            ->andReturn(['statusCode' => 201]);
-        $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->update('something', 'something', new Config()));
-    }
-
-    /**
-     * @expectedException LogicException
-     */
     public function testWriteVisibility()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once()->andReturn([
-            'statusCode' => 200,
-        ]);
+        $mock->shouldReceive('request')->never();
         $adapter = new WebDAVAdapter($mock);
-        $this->assertInternalType('array', $adapter->write('something', 'something', new Config([
+        $this->expectException(LogicException::class);
+        $adapter->write('something', 'something', new Config([
             'visibility' => 'private',
-        ])));
+        ]));
     }
 
     public function testReadStream()
@@ -145,9 +134,16 @@ class WebDAVTests extends TestCase
                 'last-modified' => date('Y-m-d H:i:s'),
             ],
         ]);
-        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
-        $result = $adapter->readStream('file.txt');
-        $this->assertInternalType('resource', $result['stream']);
+        $adapter = new WebDAVAdapter($mock);
+        $resource = $adapter->readStream('file.txt');
+        $this->assertIsResource($resource);
+        $result = "";
+        while (!feof($resource)) {
+            $read = fread($resource, 100);
+            $this->assertIsString($read);
+            $result .= $read;
+        }
+        $this->assertSame('contents', $result);
     }
 
     public function testRename()
@@ -156,9 +152,8 @@ class WebDAVTests extends TestCase
         $mock->shouldReceive('request')->once()->andReturn([
             'statusCode' => 200,
         ]);
-        $adapter = new WebDAVAdapter($mock, 'bucketname');
-        $result = $adapter->rename('old', 'new');
-        $this->assertTrue($result);
+        $adapter = new WebDAVAdapter($mock);
+        $adapter->move('old', 'new', new Config());
     }
 
     public function testRenameFail()
@@ -167,18 +162,18 @@ class WebDAVTests extends TestCase
         $mock->shouldReceive('request')->once()->andReturn([
             'statusCode' => 404,
         ]);
-        $adapter = new WebDAVAdapter($mock, 'bucketname');
-        $result = $adapter->rename('old', 'new');
-        $this->assertFalse($result);
+        $adapter = new WebDAVAdapter($mock);
+        $this->expectException(UnableToMoveFile::class);
+        $adapter->move('old', 'new', new Config());
     }
 
     public function testRenameFailException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once()->andThrow('Sabre\DAV\Exception\NotFound');
-        $adapter = new WebDAVAdapter($mock, 'bucketname');
-        $result = $adapter->rename('old', 'new');
-        $this->assertFalse($result);
+        $mock->shouldReceive('request')->once()->andThrow($this->newClientHttpException(500));
+        $adapter = new WebDAVAdapter($mock);
+        $this->expectException(UnableToMoveFile::class);
+        $adapter->move('old', 'new', new Config());
     }
 
     public function testDeleteDir()
@@ -186,17 +181,16 @@ class WebDAVTests extends TestCase
         $mock = $this->getClient();
         $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andReturn(['statusCode' => 200]);
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->deleteDir('some/dirname');
-        $this->assertTrue($result);
+        $adapter->deleteDirectory('some/dirname');
     }
 
     public function testDeleteDirFailNotFound()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow($this->newClientHttpException(404));
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->deleteDir('some/dirname');
-        $this->assertFalse($result);
+        $this->expectException(UnableToDeleteDirectory::class);
+        $adapter->deleteDirectory('some/dirname');
     }
 
     public function testDeleteDirFailNot200Status()
@@ -204,8 +198,8 @@ class WebDAVTests extends TestCase
         $mock = $this->getClient();
         $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andReturn(['statusCode' => 403]);
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->deleteDir('some/dirname');
-        $this->assertFalse($result);
+        $this->expectException(UnableToDeleteDirectory::class);
+        $adapter->deleteDirectory('some/dirname');
     }
 
     public function testListContents()
@@ -231,9 +225,10 @@ class WebDAVTests extends TestCase
             ],
         ];
         $mock->shouldReceive('propFind')->twice()->andReturn($first, $second);
-        $adapter = new WebDAVAdapter($mock, 'bucketname');
+        $adapter = new WebDAVAdapter($mock);
         $listing = $adapter->listContents('', true);
-        $this->assertInternalType('array', $listing);
+        $this->assertInstanceOf(Generator::class, $listing);
+        iterator_to_array($listing);
     }
 
     public function testListContentsWithPlusInName()
@@ -248,11 +243,12 @@ class WebDAVTests extends TestCase
         ];
 
         $mock->shouldReceive('propFind')->once()->andReturn($first);
-        $adapter = new WebDAVAdapter($mock, 'bucketname');
+        $adapter = new WebDAVAdapter($mock);
         $listing = $adapter->listContents('', false);
-        $this->assertInternalType('array', $listing);
+        $this->assertInstanceOf(Generator::class, $listing);
+        $listing = iterator_to_array($listing);
         $this->assertCount(1, $listing);
-        $this->assertEquals('dirname+something', $listing[0]['path']);
+        $this->assertEquals('bucketname/dirname+something', $listing[0]['path']);
     }
 
     public function testListContentsWithUrlEncodedSpaceInName()
@@ -267,29 +263,31 @@ class WebDAVTests extends TestCase
         ];
 
         $mock->shouldReceive('propFind')->once()->andReturn($first);
-        $adapter = new WebDAVAdapter($mock, '/My Library');
+        $adapter = new WebDAVAdapter($mock);
         $listing = $adapter->listContents('', false);
-        $this->assertInternalType('array', $listing);
+        $this->assertInstanceOf(Generator::class, $listing);
+        $listing = iterator_to_array($listing);
         $this->assertCount(1, $listing);
-        $this->assertEquals('New Record 1.mp3', $listing[0]['path']);
-        $this->assertEquals('file', $listing[0]['type']);
-        $this->assertEquals('8223370', $listing[0]['size']);
+        $attributes = $listing[0];
+        $this->assertInstanceOf(\League\Flysystem\FileAttributes::class, $attributes);
+        $this->assertEquals('My Library/New Record 1.mp3', $attributes->path());
+        $this->assertEquals('file', $attributes->type());
+        $this->assertEquals(8223370, $attributes->fileSize());
     }
 
-    public function methodProvider()
+    public function methodProvider(): array
     {
         return [
-            ['getMetadata'],
-            ['getTimestamp'],
-            ['getMimetype'],
-            ['getSize'],
+            ['lastModified'],
+            ['mimeType'],
+            ['fileSize'],
         ];
     }
 
     /**
      * @dataProvider  methodProvider
      */
-    public function testMetaMethods($method)
+    public function testMetaMethods(string $method)
     {
         $mock = $this->getClient();
         $mock->shouldReceive('propFind')->once()->andReturn([
@@ -300,7 +298,7 @@ class WebDAVTests extends TestCase
         ]);
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->{$method}('object.ext');
-        $this->assertInternalType('array', $result);
+        $this->assertInstanceOf(\League\Flysystem\FileAttributes::class, $result);
     }
 
     public function testCreateDir()
@@ -310,7 +308,7 @@ class WebDAVTests extends TestCase
 
         $mock->shouldReceive('propFind')
             ->once()
-            ->andThrow(new \Sabre\DAV\Exception('Not found'));
+            ->andThrow($this->newClientHttpException(404));
 
         $mock->shouldReceive('request')
             ->once()
@@ -320,8 +318,7 @@ class WebDAVTests extends TestCase
             ]);
 
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->createDir('dirname', new Config());
-        $this->assertInternalType('array', $result);
+        $adapter->createDirectory('dirname', new Config());
     }
 
     public function testCreateDirRecursive()
@@ -331,7 +328,7 @@ class WebDAVTests extends TestCase
 
         $mock->shouldReceive('propFind')
             ->times(2)
-            ->andThrow(new \Sabre\DAV\Exception('Not found'));
+            ->andThrow($this->newClientHttpException(404));
 
         $mock->shouldReceive('request')
             ->once()
@@ -348,8 +345,7 @@ class WebDAVTests extends TestCase
             ]);
 
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->createDir('dirname/subdirname', new Config());
-        $this->assertInternalType('array', $result);
+        $adapter->createDirectory('dirname/subdirname', new Config());
     }
 
     public function testCreateDirIfExists()
@@ -370,8 +366,7 @@ class WebDAVTests extends TestCase
             ->never();
 
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->createDir('dirname', new Config());
-        $this->assertInternalType('array', $result);
+        $adapter->createDirectory('dirname', new Config());
     }
 
     public function testCreateDirFail()
@@ -381,7 +376,7 @@ class WebDAVTests extends TestCase
 
         $mock->shouldReceive('propFind')
             ->once()
-            ->andThrow(new \Sabre\DAV\Exception('Not found'));
+            ->andThrow($this->newClientHttpException(404));
 
         $mock->shouldReceive('request')
             ->once()
@@ -391,8 +386,8 @@ class WebDAVTests extends TestCase
             ]);
 
         $adapter = new WebDAVAdapter($mock);
-        $result = $adapter->createDir('dirname', new Config());
-        $this->assertFalse($result);
+        $this->expectException(UnableToCreateDirectory::class);
+        $adapter->createDirectory('dirname', new Config());
     }
 
     public function testRead()
@@ -405,9 +400,9 @@ class WebDAVTests extends TestCase
                 'last-modified' => [date('Y-m-d H:i:s')],
             ],
         ]);
-        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
+        $adapter = new WebDAVAdapter($mock);
         $result = $adapter->read('file.txt');
-        $this->assertInternalType('array', $result);
+        $this->assertSame('contents', $result);
     }
 
     public function testReadFail()
@@ -420,9 +415,9 @@ class WebDAVTests extends TestCase
                 'last-modified' => [date('Y-m-d H:i:s')],
             ],
         ]);
-        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
-        $result = $adapter->read('file.txt');
-        $this->assertFalse($result);
+        $adapter = new WebDAVAdapter($mock);
+        $this->expectException(UnableToReadFile::class);
+        $adapter->read('file.txt');
     }
 
     public function testReadStreamFail()
@@ -435,18 +430,18 @@ class WebDAVTests extends TestCase
                 'last-modified' => [date('Y-m-d H:i:s')],
             ],
         ]);
-        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
-        $result = $adapter->readStream('file.txt');
-        $this->assertFalse($result);
+        $adapter = new WebDAVAdapter($mock);
+        $this->expectException(UnableToReadFile::class);
+        $adapter->readStream('file.txt');
     }
 
     public function testReadException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->andThrow('Sabre\DAV\Exception\NotFound');
-        $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
-        $result = $adapter->read('file.txt');
-        $this->assertFalse($result);
+        $mock->shouldReceive('request')->andThrow($this->newClientHttpException(404));
+        $adapter = new WebDAVAdapter($mock);
+        $this->expectException(UnableToReadFile::class);
+        $adapter->read('file.txt');
     }
 
     public function testNativeCopy()
@@ -460,8 +455,7 @@ class WebDAVTests extends TestCase
             'statusCode' => 201
         ]);
 
-        $adapter = new WebDAVAdapter($clientMock, 'prefix', false);
-        $result = $adapter->copy('file.txt', 'newFile.txt');
-        $this->assertTrue($result);
+        $adapter = new WebDAVAdapter($clientMock);
+        $adapter->copy('file.txt', 'newFile.txt', new Config());
     }
 }
