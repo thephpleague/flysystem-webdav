@@ -1,5 +1,8 @@
 <?php
 
+use Sabre\HTTP\ClientHttpException;
+use Sabre\DAV\Exception\NotFound;
+use Sabre\DAV\Client;
 use League\Flysystem\Config;
 use League\Flysystem\Filesystem;
 use League\Flysystem\WebDAV\WebDAVAdapter;
@@ -9,9 +12,12 @@ class WebDAVTests extends TestCase
 {
     use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 
+    /**
+     * @return Mockery\LegacyMockInterface|Mockery\MockInterface|Client
+     */
     protected function getClient()
     {
-        return Mockery::mock('Sabre\DAV\Client');
+        return Mockery::mock(Client::class);
     }
 
     public function testHas()
@@ -38,8 +44,8 @@ class WebDAVTests extends TestCase
     public function provideExceptionsForHasFail()
     {
         return [
-            [Mockery::mock('Sabre\DAV\Exception\NotFound')],
-            [Mockery::mock('Sabre\HTTP\ClientHttpException')],
+            [Mockery::mock(NotFound::class)],
+            [Mockery::mock(ClientHttpException::class)],
         ];
     }
 
@@ -83,7 +89,7 @@ class WebDAVTests extends TestCase
 
     protected function getLargeTmpStream()
     {
-        $size = intval($this->getMemoryLimit() * 1.5);
+        $size = (int)($this->getMemoryLimit() * 1.5);
         $tmp = tmpfile();
         fseek($tmp, $size);
         fprintf($tmp, 'a');
@@ -102,12 +108,10 @@ class WebDAVTests extends TestCase
         ];
 
         if (!preg_match("/^(\d+)([KMG]?)$/i", ini_get('memory_limit'), $match)) {
-            throw new Exception('invalid memory_limit?');
+            throw new UnexpectedValueException('invalid memory_limit?');
         }
 
-        $limit = $match[1] * pow(1024, $unit_factor[strtoupper($match[2])]);
-
-        return $limit;
+        return $match[1] * (1024 ** $unit_factor[strtoupper($match[2])]);
     }
 
     public function testUpdate()
@@ -131,6 +135,7 @@ class WebDAVTests extends TestCase
         $this->assertTrue(is_array($adapter->write('something', 'something', new Config([
             'visibility' => 'private',
         ]))));
+
     }
 
     public function testReadStream()
@@ -174,7 +179,7 @@ class WebDAVTests extends TestCase
     public function testRenameFailException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->once()->andThrow(NotFound::class);
         $adapter = new WebDAVAdapter($mock, 'bucketname');
         $result = $adapter->rename('old', 'new');
         $this->assertFalse($result);
@@ -192,7 +197,7 @@ class WebDAVTests extends TestCase
     public function testDeleteDirFailNotFound()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->with('DELETE', 'some/dirname')->once()->andThrow(NotFound::class);
         $adapter = new WebDAVAdapter($mock);
         $result = $adapter->deleteDir('some/dirname');
         $this->assertFalse($result);
@@ -304,7 +309,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDir()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -325,7 +329,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDirRecursive()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -353,7 +356,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDirIfExists()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -375,7 +377,6 @@ class WebDAVTests extends TestCase
 
     public function testCreateDirFail()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $mock */
         $mock = $this->getClient();
 
         $mock->shouldReceive('propFind')
@@ -435,6 +436,7 @@ class WebDAVTests extends TestCase
             ],
         ]);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
+        /** @var resource|false $result */
         $result = $adapter->readStream('file.txt');
         $this->assertFalse($result);
     }
@@ -442,7 +444,7 @@ class WebDAVTests extends TestCase
     public function testReadException()
     {
         $mock = $this->getClient();
-        $mock->shouldReceive('request')->andThrow('Sabre\DAV\Exception\NotFound');
+        $mock->shouldReceive('request')->andThrow(NotFound::class);
         $adapter = new WebDAVAdapter($mock, 'bucketname', 'prefix');
         $result = $adapter->read('file.txt');
         $this->assertFalse($result);
@@ -450,7 +452,6 @@ class WebDAVTests extends TestCase
 
     public function testNativeCopy()
     {
-        /** @var Sabre\DAV\Client|Mockery\Mock $clientMock */
         $clientMock = $this->getClient();
 
         $clientMock->shouldReceive('getAbsoluteUrl')->andReturn('http://webdav.local/prefix/newFile.txt');
