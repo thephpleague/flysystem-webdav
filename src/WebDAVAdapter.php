@@ -256,7 +256,7 @@ class WebDAVAdapter extends AbstractAdapter
         $directories = explode('/', $path);
         if (count($directories) > 1) {
             $parentDirectories = array_splice($directories, 0, count($directories) - 1);
-            if (!$this->createDir(implode('/', $parentDirectories), $config)) {
+            if (!$this->createDir(implode('/', $parentDirectories) . '/', $config)) {
                 return false;
             }
         }
