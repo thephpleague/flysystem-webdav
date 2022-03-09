@@ -133,7 +133,7 @@ class WebDAVAdapter implements FilesystemAdapter
                 throw new RuntimeException('Unexpected status code received: ' . $statusCode);
             }
         } catch (Throwable $exception) {
-            throw UnableToWriteFile::atLocation($path, '', $exception);
+            throw UnableToWriteFile::atLocation($path, 'Failed to upload file ' . $exception->getMessage(), $exception);
         }
     }
 
@@ -150,7 +150,7 @@ class WebDAVAdapter implements FilesystemAdapter
 
             return $response['body'];
         } catch (Throwable $exception) {
-            throw UnableToReadFile::fromLocation($path, '', $exception);
+            throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
         }
     }
 
@@ -170,7 +170,7 @@ class WebDAVAdapter implements FilesystemAdapter
 
             return $response->getBodyAsStream();
         } catch (Throwable $exception) {
-            throw UnableToReadFile::fromLocation($path, '', $exception);
+            throw UnableToReadFile::fromLocation($path, $exception->getMessage(), $exception);
         }
     }
 
@@ -187,7 +187,7 @@ class WebDAVAdapter implements FilesystemAdapter
             }
         } catch (Throwable $exception) {
             if ( ! ($exception instanceof ClientHttpException && $exception->getCode() === 404)) {
-                throw UnableToDeleteFile::atLocation($path, '', $exception);
+                throw UnableToDeleteFile::atLocation($path, $exception->getMessage(), $exception);
             }
         }
     }
@@ -204,7 +204,7 @@ class WebDAVAdapter implements FilesystemAdapter
             }
         } catch (Throwable $exception) {
             if ( ! ($exception instanceof ClientHttpException && $exception->getCode() === 404)) {
-                throw UnableToDeleteDirectory::atLocation($path, '', $exception);
+                throw UnableToDeleteDirectory::atLocation($path, $exception->getMessage(), $exception);
             }
         }
     }
@@ -434,7 +434,7 @@ class WebDAVAdapter implements FilesystemAdapter
 
             return $result[$property];
         } catch (Throwable $exception) {
-            throw UnableToRetrieveMetadata::create($path, $section, '', $exception);
+            throw UnableToRetrieveMetadata::create($path, $section, $exception->getMessage(), $exception);
         }
     }
 }
