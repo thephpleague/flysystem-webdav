@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace League\Flysystem\WebDAV;
 
+use League\Flysystem\ChecksumProvider;
 use League\Flysystem\Config;
 use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
@@ -16,6 +17,7 @@ use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToMoveFile;
+use League\Flysystem\UnableToProvideChecksum;
 use League\Flysystem\UnableToReadFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use League\Flysystem\UnableToSetVisibility;
@@ -37,7 +39,7 @@ use function implode;
 use function parse_url;
 use function rawurldecode;
 
-class WebDAVAdapter implements FilesystemAdapter, PublicUrlGenerator
+class WebDAVAdapter implements FilesystemAdapter, PublicUrlGenerator, ChecksumProvider
 {
     public const ON_VISIBILITY_THROW_ERROR = 'throw';
     public const ON_VISIBILITY_IGNORE = 'ignore';
@@ -446,5 +448,19 @@ class WebDAVAdapter implements FilesystemAdapter, PublicUrlGenerator
     public function publicUrl(string $path, Config $config): string
     {
         return $this->client->getAbsoluteUrl($this->encodePath($this->prefixer->prefixPath($path)));
+    }
+
+    public function checksum(string $path, Config $config): string
+    {
+        $algo = $config->get('checksum_algo', 'md5');
+        $contents = $this->read($path);
+        error_clear_last();
+        $checksum = @hash($algo, $contents);
+
+        if ($checksum === false) {
+            throw new UnableToProvideChecksum(error_get_last()['message'] ?? '', $path);
+        }
+
+        return $checksum;
     }
 }
