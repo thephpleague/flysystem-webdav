@@ -9,6 +9,7 @@ use League\Flysystem\Config;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToSetVisibility;
 use League\Flysystem\Visibility;
+use Sabre\DAV\Client;
 
 abstract class WebDAVAdapterTestCase extends FilesystemAdapterTestCase
 {
@@ -48,7 +49,7 @@ abstract class WebDAVAdapterTestCase extends FilesystemAdapterTestCase
     {
         $this->runScenario(function () {
             $adapter = $this->adapter();
-            $adapter->createDirectory('/some/directory/', new Config);
+            $adapter->createDirectory('/some/directory/', new Config());
 
             self::assertTrue($adapter->directoryExists('/some/directory/'));
         });
@@ -130,6 +131,30 @@ abstract class WebDAVAdapterTestCase extends FilesystemAdapterTestCase
 
         $this->runScenario(function () {
             $this->adapter()->move('source.txt', 'destination.txt', new Config());
+        });
+    }
+
+    /**
+     * @test
+     */
+    public function part_of_prefix_already_exists(): void
+    {
+        $this->runScenario(function () {
+            $config = new Config();
+
+            $adapter1 = new WebDAVAdapter(
+                new Client(['baseUri' => 'http://localhost:4040/']),
+                'directory1/prefix1',
+            );
+            $adapter1->createDirectory('folder1', $config);
+            self::assertTrue($adapter1->directoryExists('/folder1'));
+
+            $adapter2 = new WebDAVAdapter(
+                new Client(['baseUri' => 'http://localhost:4040/']),
+                'directory1/prefix2',
+            );
+            $adapter2->createDirectory('folder2', $config);
+            self::assertTrue($adapter2->directoryExists('/folder2'));
         });
     }
 }
