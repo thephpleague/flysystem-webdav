@@ -233,6 +233,10 @@ class WebDAVAdapter implements FilesystemAdapter, PublicUrlGenerator
                 throw UnableToCreateDirectory::dueToFailure($path, $exception);
             }
 
+            if ($response['statusCode'] === 405) {
+                continue;
+            }
+
             if ($response['statusCode'] !== 201) {
                 throw UnableToCreateDirectory::atLocation($path, 'Failed to create directory at: ' . $location);
             }
